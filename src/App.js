@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import RequireAuth from './RequireAuth'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import Files from './pages/Files'
 
 function App() {
   return (
@@ -14,6 +15,14 @@ function App() {
           element={
             <RequireAuth>
               <Home />
+            </RequireAuth>
+          } 
+        />
+        <Route 
+          path="/files" 
+          element={
+            <RequireAuth>
+              <Files />
             </RequireAuth>
           } 
         />

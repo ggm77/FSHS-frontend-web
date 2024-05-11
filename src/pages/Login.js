@@ -10,7 +10,7 @@ const Login = () => {
  
     let navigate = useNavigate();
 
-    const apiUrl = "http://raspinas.iptime.org:8080/api/v1"
+    const apiUrl = "http://raspinas.iptime.org:8085/api/v1"
 
      // 이메일과 비밀번호를 위한 상태 password
     const [userEmail, setUserEmail] = useState('');
@@ -30,6 +30,7 @@ const Login = () => {
                     "Authorization"
                 ] = 'Bearer ' + response.data.accessToken;
                 localStorage.setItem('accessToken', response.data.accessToken);
+                localStorage.setItem('refreshToken', response.data.refreshToken);
                 localStorage.setItem("userId", response.data.id);
                 localStorage.setItem("userProfilePictureUrl", response.data.userProfilePictureUrl)
                 navigate("/")
