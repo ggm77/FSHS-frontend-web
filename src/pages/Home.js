@@ -2,6 +2,8 @@ import axios from 'axios';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import folderIcon from '../assets/folderIcon.png';
+import trashcan from '../assets/trashcan.png';
+import pen from '../assets/pen.png';
 
 const Home = () => {
 
@@ -134,6 +136,37 @@ const Home = () => {
 
     }
 
+    const deleteFile = (id, isDirectory, originalFileName) => {
+        if(window.confirm("정말로 '"+ originalFileName +"'을(를) 삭제하시겠습니까?")){
+            axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+
+            if(isDirectory){
+                axios.delete(apiUrl+"/folder/"+id)
+                .then(response => {
+                    if(response.status === 204){
+                        alert("삭제 완료")
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                    alert("삭제 실패");
+                })
+            } else{
+                axios.delete(apiUrl+"/files/"+id)
+                    .then(response => {
+                        if(response.status === 204){
+                            alert("삭제 완료")
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert("삭제 실패");
+                    })
+            }
+            
+        }
+    }
+
 
     return (
     <div style={{ marginLeft: "10px"}}>
@@ -152,13 +185,17 @@ const Home = () => {
         </div>
         {items.map(item => (
             <div key={item.id}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px', marginTop: "5px" }}>
                     <img src={ item.directory ? (
                         folderIcon
                     ) : (
                         apiUrl + "/streaming-thumbnail?path=" + item.url
                     )} style={{ width: '30px', height: '30px', marginRight: '10px' }} />
                     <a  href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
+                    <div style={{ marginLeft: "auto"}}>
+                        <img src={pen} style={{ height: "30px", marginRight: "10px" }}/>
+                        <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }}/>
+                    </div>        
                 </div>
                 <hr style={{ width: '100%', margin: '0' }} />
             </div>
