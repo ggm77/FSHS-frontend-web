@@ -12,6 +12,7 @@ const Home = () => {
     const [items, setItems] = useState([]);
     const url = searchParams.get("url");
     const parentUrl = url ? (url.substring(0, url.lastIndexOf('/'))) : "";
+    const [file, setFile] = useState(null);
     const location = useLocation();
 
     const findDirectory = (data, targetUrl) => {
@@ -67,6 +68,7 @@ const Home = () => {
                                 .catch(error => {
                                     console.error(error);
                                 });
+
                         })
                         .catch(error => {
                             console.error(error);
@@ -76,11 +78,71 @@ const Home = () => {
             });
     }, []);
 
+    const handleFileChange = (event) => {
+        setFile(event.target.files[0]);
+    }
+
+    const handleUpload = () => {
+        if(!file) {
+            alert("파일을 선택해주세요.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('files', file);
+        formData.append('info', JSON.stringify({
+            "path":url === null || url === "" || url === "/"+userId ? "/" : url.substring(userId.length+1),
+            "secrete":false
+        }))
+
+        axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+        axios.post(apiUrl+"/files", formData)
+            .then(response => {
+                if(response.status === 201){
+                    alert("업로드 성공");
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                if(error.response && error.response.status === 403) {
+                    axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                        .then(response => {
+                            localStorage.setItem('accessToken', response.data.accessToken);
+                            localStorage.setItem('refreshToken', response.data.refreshToken);
+    
+                            axios.post(apiUrl + "/files", formData)
+                                .then(response => {
+                                    if(response.status === 201){
+                                        alert("업로드 성공");
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error(error);
+                                    alert("업로드 실패");
+                                });
+                                
+                        })
+                        .catch(error => {
+                            console.error(error);
+                            navigate("/login");
+                        });
+                }
+                else if(error.response.status != 201) {
+                    alert("업로드 실패");
+                }
+            })
+
+    }
+
 
     return (
     <div style={{ marginLeft: "10px"}}>
-        <div>
-            <h4>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</h4>
+        <div style={{ display: "flex" }}>
+            <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
+            <div style={{ marginLeft: "auto", marginTop: "27px"}}>
+                <input type="file" onChange={handleFileChange} style={{ width: "250px", height: "30px"}}/>
+                <button onClick={handleUpload} style={{ width: "70px", height: "30px"}}>Upload</button>
+            </div>
         </div>
         <div>
             <hr style={{ width: '100%' }} />
