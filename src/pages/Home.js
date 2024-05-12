@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import folderIcon from '../assets/folderIcon.png';
 import trashcan from '../assets/trashcan.png';
 import pen from '../assets/pen.png';
+import fileIcon from '../assets/fileIcon.png';
+import logo from '../assets/logo.png';
 
 const Home = () => {
 
@@ -102,6 +104,7 @@ const Home = () => {
             .then(response => {
                 if(response.status === 201){
                     alert("업로드 성공");
+                    window.location.reload();
                 }
             })
             .catch(error => {
@@ -116,6 +119,7 @@ const Home = () => {
                                 .then(response => {
                                     if(response.status === 201){
                                         alert("업로드 성공");
+                                        window.location.reload();
                                     }
                                 })
                                 .catch(error => {
@@ -145,6 +149,7 @@ const Home = () => {
                 .then(response => {
                     if(response.status === 204){
                         alert("삭제 완료")
+                        window.location.reload();
                     }
                 })
                 .catch(error => {
@@ -156,6 +161,7 @@ const Home = () => {
                     .then(response => {
                         if(response.status === 204){
                             alert("삭제 완료")
+                            window.location.reload();
                         }
                     })
                     .catch(error => {
@@ -167,16 +173,86 @@ const Home = () => {
         }
     }
 
+    const updateFile = (id, isDirectory, url, fileExtension) => {
+        
+        if(isDirectory){
+            const changedUrl = url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)+"/"
+            const inputValue = prompt("새로운 이름을 입력하세요:")
+            const path = changedUrl + inputValue;
+            const data = {path};
+
+            if(inputValue === null){
+                return ;
+            }
+
+            axios.patch(apiUrl+"/folder/"+id, data)
+                    .then(response => {
+                        if(response.status === 200){
+                            alert("수정 완료")
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert("수정 실패");
+                    })
+        } else{
+            const newName = prompt("새로운 이름을 입력하세요:");
+
+            if(newName === null){
+                return ;
+            }
+            if(newName.includes('.')){
+                alert("이름에 '.'은 들어갈 수 없습니다.");
+                return ;
+            }
+
+            const originalFileName = newName+"."+fileExtension;
+            const data = {originalFileName};
+            axios.patch(apiUrl+"/files/"+id, data)
+                    .then(response => {
+                        if(response.status === 200){
+                            alert("수정 완료")
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert("수정 실패");
+                    })
+        }
+    }
+
+    const createFolder = (url) => {
+        const path = (url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)+"/") + prompt("새로운 이름을 입력하세요:");
+        const data = {path};
+
+        axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+        axios.post(apiUrl+"/folder", data)
+            .then(response => {
+                if(response.status === 201){
+                    alert("폴더 생성 성공");
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error(error);
+                alert("폴더 생성 실패");
+            })
+    }
+
 
     return (
     <div style={{ marginLeft: "10px"}}>
         <div style={{ display: "flex" }}>
-            <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
+            <img src={logo} style={{height: "35px", marginTop: "27px", marginLeft: "5px"}}></img>
             <div style={{ marginLeft: "auto", marginTop: "27px"}}>
-                <input type="file" onChange={handleFileChange} style={{ width: "250px", height: "30px"}}/>
-                <button onClick={handleUpload} style={{ width: "70px", height: "30px"}}>Upload</button>
+                <input type="file" onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
+                <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload File</button>
+                <button onClick={() => createFolder(url)} style={{ width: "70px", height: "35px"}}>New Folder</button>
             </div>
         </div>
+        <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
         <div>
             <hr style={{ width: '100%' }} />
             <img src={folderIcon} style={{ width: '30px', height: '30px', marginRight: '10px' }} />
@@ -189,11 +265,16 @@ const Home = () => {
                     <img src={ item.directory ? (
                         folderIcon
                     ) : (
-                        apiUrl + "/streaming-thumbnail?path=" + item.url
-                    )} style={{ width: '30px', height: '30px', marginRight: '10px' }} />
+                        item.hasThumbnail ? (
+                            apiUrl + "/streaming-thumbnail?path=" + item.url
+                        ) : (
+                            fileIcon
+                        )
+                        
+                    )} style={{ width: '30px', height: '30px', objectFit: "contain", marginRight: '10px' }} />
                     <a  href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
                     <div style={{ marginLeft: "auto"}}>
-                        <img src={pen} style={{ height: "30px", marginRight: "10px" }}/>
+                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }}/>
                         <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }}/>
                     </div>        
                 </div>
