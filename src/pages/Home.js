@@ -63,11 +63,14 @@ const Home = () => {
                         .then(response => {
                             localStorage.setItem('accessToken', response.data.accessToken);
                             localStorage.setItem('refreshToken', response.data.refreshToken);
-    
+                            
+                            axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
                             axios.get(apiUrl + "/files")
                                 .then(response => {
                                     console.log(response.data);
-                                    setItems(Array.isArray(response.data) ? response.data : [response.data].filter(Boolean));
+
+                                    const directory = findDirectory(response.data, url ? url : "/" + userId);
+                                    setItems(Array.isArray(directory) ? directory : [directory].filter(Boolean));
                                 })
                                 .catch(error => {
                                     console.error(error);
@@ -115,6 +118,7 @@ const Home = () => {
                             localStorage.setItem('accessToken', response.data.accessToken);
                             localStorage.setItem('refreshToken', response.data.refreshToken);
     
+                            axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
                             axios.post(apiUrl + "/files", formData)
                                 .then(response => {
                                     if(response.status === 201){
@@ -132,8 +136,8 @@ const Home = () => {
                             console.error(error);
                             navigate("/login");
                         });
-                }
-                else if(error.response.status != 201) {
+                } else {
+                    console.error(error);
                     alert("업로드 실패");
                 }
             })
@@ -153,8 +157,37 @@ const Home = () => {
                     }
                 })
                 .catch(error => {
-                    console.error(error);
-                    alert("삭제 실패");
+
+                    if(error.response && error.response.status === 403) {
+                        axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                            .then(response => {
+                                localStorage.setItem('accessToken', response.data.accessToken);
+                                localStorage.setItem('refreshToken', response.data.refreshToken);
+        
+                                axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+                                axios.delete(apiUrl + "/folder" + id)
+                                    .then(response => {
+                                        if(response.status === 204){
+                                            alert("삭제 완료");
+                                            window.location.reload();
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error(error);
+                                        alert("삭제 실패");
+                                        return ;
+                                    });
+                                    
+                            })
+                            .catch(error => {
+                                console.error(error);
+                                navigate("/login");
+                            });
+                    } else {
+                        console.error(error);
+                        alert("삭제 실패");
+                    }
+
                 })
             } else{
                 axios.delete(apiUrl+"/files/"+id)
@@ -165,8 +198,36 @@ const Home = () => {
                         }
                     })
                     .catch(error => {
-                        console.error(error);
-                        alert("삭제 실패");
+
+                        if(error.response && error.response.status === 403) {
+                            axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                                .then(response => {
+                                    localStorage.setItem('accessToken', response.data.accessToken);
+                                    localStorage.setItem('refreshToken', response.data.refreshToken);
+            
+                                    axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+                                    axios.delete(apiUrl + "/files" + id)
+                                        .then(response => {
+                                            if(response.status === 204){
+                                                alert("삭제 완료");
+                                                window.location.reload();
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error(error);
+                                            alert("삭제 실패");
+                                            return ;
+                                        });
+                                        
+                                })
+                                .catch(error => {
+                                    console.error(error);
+                                    navigate("/login");
+                                });
+                        } else {
+                            console.error(error);
+                            alert("삭제 실패");
+                        }
                     })
             }
             
@@ -193,8 +254,36 @@ const Home = () => {
                         }
                     })
                     .catch(error => {
-                        console.error(error);
-                        alert("수정 실패");
+
+                        if(error.response && error.response.status === 403) {
+                            axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                                .then(response => {
+                                    localStorage.setItem('accessToken', response.data.accessToken);
+                                    localStorage.setItem('refreshToken', response.data.refreshToken);
+            
+                                    axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+                                    axios.patch(apiUrl + "/folder/"+id, data)
+                                        .then(response => {
+                                            if(response.status === 200){
+                                                alert("수정 완료");
+                                                window.location.reload();
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error(error);
+                                            alert("수정 실패");
+                                            return ;
+                                        });
+                                        
+                                })
+                                .catch(error => {
+                                    console.error(error);
+                                    navigate("/login");
+                                });
+                        } else {
+                            console.error(error);
+                            alert("수정 실패");
+                        }
                     })
         } else{
             const newName = prompt("새로운 이름을 입력하세요:");
@@ -217,8 +306,36 @@ const Home = () => {
                         }
                     })
                     .catch(error => {
-                        console.error(error);
-                        alert("수정 실패");
+
+                        if(error.response && error.response.status === 403) {
+                            axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                                .then(response => {
+                                    localStorage.setItem('accessToken', response.data.accessToken);
+                                    localStorage.setItem('refreshToken', response.data.refreshToken);
+            
+                                    axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+                                    axios.patch(apiUrl + "/files/"+id, data)
+                                        .then(response => {
+                                            if(response.status === 200){
+                                                alert("수정 완료");
+                                                window.location.reload();
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error(error);
+                                            alert("수정 실패");
+                                            return ;
+                                        });
+                                        
+                                })
+                                .catch(error => {
+                                    console.error(error);
+                                    navigate("/login");
+                                });
+                        }else{
+                            console.error(error);
+                            alert("수정 실패");
+                        }
                     })
         }
     }
@@ -236,8 +353,37 @@ const Home = () => {
                 }
             })
             .catch(error => {
-                console.error(error);
-                alert("폴더 생성 실패");
+                console.log("1");
+                if(error.response && error.response.status === 403) {
+                    axios.post(apiUrl + "/refresh-token", {"refreshToken" : localStorage.getItem("refreshToken")})
+                        .then(response => {
+                            console.log("asdf")
+                            localStorage.setItem('accessToken', response.data.accessToken);
+                            localStorage.setItem('refreshToken', response.data.refreshToken);
+    
+                            axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
+                            axios.post(apiUrl + "/folder", data)
+                                .then(response => {
+                                    if(response.status === 201){
+                                        alert("폴더 생성 성공");
+                                        window.location.reload();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error(error);
+                                    alert("폴더 생성 실패");
+                                    return ;
+                                });
+                                
+                        })
+                        .catch(error => {
+                            console.error(error);
+                            navigate("/login");
+                        });
+                } else {
+                    console.error(error);
+                    alert("폴더 생성 실패");
+                }
             })
     }
 
