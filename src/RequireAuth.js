@@ -3,8 +3,9 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 const isAuthenticated = () => {
     // 로컬 스토리지에서 토큰을 검색합니다.
-    const token = localStorage.getItem('accessToken');
-    return !!token;
+    const accessToken = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+    return (accessToken && refreshToken ? true : false);
   };
 
 const RequireAuth = ({ children }) => {
