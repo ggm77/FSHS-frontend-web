@@ -9,7 +9,7 @@ import logo from '../assets/logo.png';
 
 const Home = () => {
 
-    const apiUrl = "http://raspinas.iptime.org:8085/api/v1";
+    const apiUrl = "http://raspinas.iptime.org:51823/api/v1";
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const userId = localStorage.getItem("userId")
@@ -98,7 +98,7 @@ const Home = () => {
         const formData = new FormData();
         formData.append('files', file);
         formData.append('info', JSON.stringify({
-            "path":url === null || url === "" || url === "/"+userId ? "/" : url.substring(userId.length+1),
+            "path":url === null || url === "" || url === "/"+userId ? "/" : url.substring(userId.length+1)+"/",
             "secrete":false
         }))
 
