@@ -10,7 +10,7 @@ const Login = () => {
  
     let navigate = useNavigate();
 
-    const apiUrl = "http://raspinas.iptime.org:8085/api/v1"
+    const apiUrl = "http://raspinas.iptime.org:51823/api/v1"
 
      // 이메일과 비밀번호를 위한 상태 password
     const [userEmail, setUserEmail] = useState('');
