@@ -16,7 +16,7 @@ const Home = () => {
     const [items, setItems] = useState([]);
     const url = searchParams.get("url");
     const parentUrl = url ? (url.substring(0, url.lastIndexOf('/'))) : "";
-    const [file, setFile] = useState(null);
+    const [file, setFile] = useState([]);
     const [uploadProgress, setUploadProgress] = useState(0);
 
     const findDirectory = (data, targetUrl) => {
@@ -76,7 +76,8 @@ const Home = () => {
     }, [url, userId, navigate]);
 
     const handleFileChange = (event) => {
-        setFile(event.target.files[0]);
+        const newFiles = event.target.files[0];
+        setFile(prevFiles => [...prevFiles, newFiles]);
     }
 
     const handleUpload = () => {
@@ -86,7 +87,9 @@ const Home = () => {
         }
 
         const formData = new FormData();
-        formData.append('files', file);
+        for (let f of file) {
+            formData.append('files', f);
+        }
         formData.append('info', JSON.stringify({
             "path":url === null || url === "" || url === "/"+userId ? "/" : url.substring(userId.length+1)+"/",
             "secrete":false
@@ -391,11 +394,19 @@ const Home = () => {
         <div style={{ display: "flex" }}>
             <img src={logo} style={{height: "35px", marginTop: "27px", marginLeft: "5px"}} alt="logo"/>
             <div style={{ marginLeft: "auto", marginTop: "27px"}}>
-                <input type="file" onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
+                <input type="file" multiple onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
                 <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload File</button>
                 <button onClick={() => createFolder(url)} style={{ width: "70px", height: "35px"}}>New Folder</button>
             </div>
         </div>
+        <div>
+        <h3>Selected Files:</h3>
+        <ul>
+          {Array.from(file).map((f, index) => (
+            <li key={index}>{f.name}</li>
+          ))}
+        </ul>
+      </div>
         <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
         {uploadProgress > 0 && (
             <div style={{ marginTop: '10px' }}>
