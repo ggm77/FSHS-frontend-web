@@ -76,8 +76,7 @@ const Home = () => {
     }, [url, userId, navigate]);
 
     const handleFileChange = (event) => {
-        const newFiles = event.target.files[0];
-        setFile(prevFiles => [...prevFiles, newFiles]);
+        setFile(event.target.files);
     }
 
     const handleUpload = () => {
