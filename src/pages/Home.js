@@ -43,8 +43,13 @@ const Home = () => {
                 console.log(response.data);
     
                 const directory = findDirectory(response.data, url ? url : "/" + userId);
-                setItems(Array.isArray(directory) ? directory : [directory].filter(Boolean));
-    
+                const data = Array.isArray(directory) ? directory : [directory].filter(Boolean);
+                
+
+                const folderData = data.filter(data => data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+                const fileData = data.filter(data => !data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+
+                setItems([...folderData, ...fileData]);
             })
             .catch(error => {
                 console.error(error);
@@ -60,7 +65,13 @@ const Home = () => {
                                     console.log(response.data);
 
                                     const directory = findDirectory(response.data, url ? url : "/" + userId);
-                                    setItems(Array.isArray(directory) ? directory : [directory].filter(Boolean));
+                                    const data = Array.isArray(directory) ? directory : [directory].filter(Boolean);
+                                    
+
+                                    const folderData = data.filter(data => data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+                                    const fileData = data.filter(data => !data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+
+                                    setItems([...folderData, ...fileData]);
                                 })
                                 .catch(error => {
                                     console.error(error);
