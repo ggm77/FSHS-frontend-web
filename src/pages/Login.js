@@ -4,13 +4,15 @@ import axios from 'axios';
 
 const Login = () => {
 
+    const apiUrl = process.env.REACT_APP_API_URL;
+
     useEffect(() => {
         localStorage.clear();
     }, []);
  
     let navigate = useNavigate();
 
-    const apiUrl = "http://raspinas.iptime.org:51823/api/v1"
+    
 
      // 이메일과 비밀번호를 위한 상태 password
     const [userEmail, setUserEmail] = useState('');

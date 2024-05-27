@@ -5,7 +5,7 @@ import Hls from 'hls.js';
 
 const Files = () => {
 
-    const apiUrl = "http://raspinas.iptime.org:51823/api/v1";
+    const apiUrl = process.env.REACT_APP_API_URL;
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const userId = localStorage.getItem("userId")
