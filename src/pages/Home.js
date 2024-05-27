@@ -1,6 +1,6 @@
 import axios from 'axios';
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import folderIcon from '../assets/folderIcon.png';
 import trashcan from '../assets/trashcan.png';
 import pen from '../assets/pen.png';
@@ -17,7 +17,7 @@ const Home = () => {
     const url = searchParams.get("url");
     const parentUrl = url ? (url.substring(0, url.lastIndexOf('/'))) : "";
     const [file, setFile] = useState(null);
-    const location = useLocation();
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const findDirectory = (data, targetUrl) => {
         if (data.url === targetUrl && data.directory) {
@@ -36,16 +36,6 @@ const Home = () => {
         return null;
     };
 
-    // for Safari
-    // window.onpageshow = function(event) {
-    //     if (event.persisted) {
-    //         window.location.reload();
-    //     }
-    // };
-
-
-    
-    
     useEffect(() => {
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         axios.get(apiUrl + "/files")
@@ -83,7 +73,7 @@ const Home = () => {
                         });
                 }
             });
-    }, []);
+    }, [url, userId, navigate]);
 
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
@@ -103,10 +93,16 @@ const Home = () => {
         }))
 
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-        axios.post(apiUrl+"/files", formData)
+        axios.post(apiUrl+"/files", formData, {
+            onUploadProgress: progressEvent => {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(percentCompleted);
+            }
+        })
             .then(response => {
                 if(response.status === 201){
                     alert("업로드 성공");
+                    setUploadProgress(0);
                     window.location.reload();
                 }
             })
@@ -119,16 +115,23 @@ const Home = () => {
                             localStorage.setItem('refreshToken', response.data.refreshToken);
     
                             axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                            axios.post(apiUrl + "/files", formData)
+                            axios.post(apiUrl + "/files", formData, {
+                                onUploadProgress: progressEvent => {
+                                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                                    setUploadProgress(percentCompleted);
+                                }
+                            })
                                 .then(response => {
                                     if(response.status === 201){
                                         alert("업로드 성공");
+                                        setUploadProgress(0);
                                         window.location.reload();
                                     }
                                 })
                                 .catch(error => {
                                     console.error(error);
                                     alert("업로드 실패");
+                                    setUploadProgress(0);
                                 });
                                 
                         })
@@ -139,6 +142,7 @@ const Home = () => {
                 } else {
                     console.error(error);
                     alert("업로드 실패");
+                    setUploadProgress(0);
                 }
             })
 
@@ -165,7 +169,7 @@ const Home = () => {
                                 localStorage.setItem('refreshToken', response.data.refreshToken);
         
                                 axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                axios.delete(apiUrl + "/folder" + id)
+                                axios.delete(apiUrl + "/folder/" + id)
                                     .then(response => {
                                         if(response.status === 204){
                                             alert("삭제 완료");
@@ -175,7 +179,6 @@ const Home = () => {
                                     .catch(error => {
                                         console.error(error);
                                         alert("삭제 실패");
-                                        return ;
                                     });
                                     
                             })
@@ -206,7 +209,7 @@ const Home = () => {
                                     localStorage.setItem('refreshToken', response.data.refreshToken);
             
                                     axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                    axios.delete(apiUrl + "/files" + id)
+                                    axios.delete(apiUrl + "/files/" + id)
                                         .then(response => {
                                             if(response.status === 204){
                                                 alert("삭제 완료");
@@ -216,7 +219,6 @@ const Home = () => {
                                         .catch(error => {
                                             console.error(error);
                                             alert("삭제 실패");
-                                            return ;
                                         });
                                         
                                 })
@@ -272,7 +274,6 @@ const Home = () => {
                                         .catch(error => {
                                             console.error(error);
                                             alert("수정 실패");
-                                            return ;
                                         });
                                         
                                 })
@@ -324,7 +325,6 @@ const Home = () => {
                                         .catch(error => {
                                             console.error(error);
                                             alert("수정 실패");
-                                            return ;
                                         });
                                         
                                 })
@@ -372,7 +372,6 @@ const Home = () => {
                                 .catch(error => {
                                     console.error(error);
                                     alert("폴더 생성 실패");
-                                    return ;
                                 });
                                 
                         })
@@ -387,11 +386,10 @@ const Home = () => {
             })
     }
 
-
     return (
     <div style={{ marginLeft: "10px"}}>
         <div style={{ display: "flex" }}>
-            <img src={logo} style={{height: "35px", marginTop: "27px", marginLeft: "5px"}}></img>
+            <img src={logo} style={{height: "35px", marginTop: "27px", marginLeft: "5px"}} alt="logo"/>
             <div style={{ marginLeft: "auto", marginTop: "27px"}}>
                 <input type="file" onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
                 <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload File</button>
@@ -399,9 +397,25 @@ const Home = () => {
             </div>
         </div>
         <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
+        {uploadProgress > 0 && (
+            <div style={{ marginTop: '10px' }}>
+                <div style={{ height: '20px', width: '100%', backgroundColor: '#e0e0df', borderRadius: '2px' }}>
+                    <div style={{
+                        height: '100%',
+                        width: `${uploadProgress}%`,
+                        backgroundColor: '#3b5998',
+                        borderRadius: '2px',
+                        textAlign: 'center',
+                        color: 'white'
+                    }}>
+                        {uploadProgress}%
+                    </div>
+                </div>
+            </div>
+        )}
         <div>
             <hr style={{ width: '100%' }} />
-            <img src={folderIcon} style={{ width: '30px', height: '30px', marginRight: '10px' }} />
+            <img src={folderIcon} style={{ width: '30px', height: '30px', marginRight: '10px' }} alt="folder icon"/>
             <a href={'/?url='+parentUrl}>..</a>
             <hr style={{ width: '100%' }} />
         </div>
@@ -417,11 +431,11 @@ const Home = () => {
                             fileIcon
                         )
                         
-                    )} style={{ width: '30px', height: '30px', objectFit: "contain", marginRight: '10px' }} />
-                    <a  href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
+                    )} style={{ width: '30px', height: '30px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
+                    <a href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
                     <div style={{ marginLeft: "auto"}}>
-                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }}/>
-                        <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }}/>
+                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }} alt="edit icon"/>
+                        <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }} alt="delete icon"/>
                     </div>        
                 </div>
                 <hr style={{ width: '100%', margin: '0' }} />
