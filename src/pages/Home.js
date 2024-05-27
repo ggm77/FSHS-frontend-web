@@ -18,6 +18,8 @@ const Home = () => {
     const parentUrl = url ? (url.substring(0, url.lastIndexOf('/'))) : "";
     const [file, setFile] = useState([]);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [numberOfFiles, setNumberOfFiles] = useState(0);
+    const [numberOfFolders, setNumberOfFolders] = useState(0);
 
     const findDirectory = (data, targetUrl) => {
         if (data.url === targetUrl && data.directory) {
@@ -48,6 +50,9 @@ const Home = () => {
 
                 const folderData = data.filter(data => data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
                 const fileData = data.filter(data => !data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+
+                setNumberOfFiles(fileData.length);
+                setNumberOfFolders(folderData.length);
 
                 setItems([...folderData, ...fileData]);
             })
@@ -418,6 +423,9 @@ const Home = () => {
         </ul>
       </div>
         <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
+        <div style={{ display: "flex"}}>
+            <p>{numberOfFolders} folders, {numberOfFiles} files</p>
+        </div>
         {uploadProgress > 0 && (
             <div style={{ marginTop: '10px' }}>
                 <div style={{ height: '20px', width: '100%', backgroundColor: '#e0e0df', borderRadius: '2px' }}>
