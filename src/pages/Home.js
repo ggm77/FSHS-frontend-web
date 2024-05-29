@@ -444,23 +444,22 @@ const Home = () => {
         )}
         <div>
             <hr style={{ width: '100%' }} />
-            <img src={folderIcon} style={{ width: '30px', height: '30px', marginRight: '10px' }} alt="folder icon"/>
+            <img src={folderIcon} style={{ width: '40px', height: '40px', marginRight: '10px' }} alt="folder icon"/>
             <a href={'/?url='+parentUrl}>..</a>
             <hr style={{ width: '100%' }} />
         </div>
         {items.map(item => (
             <div key={item.id}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px', marginTop: "5px" }}>
-                    <img src={ item.directory ? (
-                        folderIcon
+                    { item.directory ? (
+                        <img src={folderIcon} style={{ width: '40px', height: '40px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
                     ) : (
-                        item.hasThumbnail ? (
+                        <img src={item.hasThumbnail ? (
                             apiUrl + "/streaming-thumbnail?path=" + item.url
                         ) : (
                             fileIcon
-                        )
-                        
-                    )} style={{ width: '30px', height: '30px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
+                        )} style={{ width: '40px', height: '40px', objectFit: "cover", marginRight: '10px' }} alt="item icon"/>
+                    )}
                     <a href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
                     <div style={{ marginLeft: "auto"}}>
                         <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }} alt="edit icon"/>
