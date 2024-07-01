@@ -14,6 +14,7 @@ const Files = () => {
     const isVideo = searchParams.get("is_video");
     const fileUrl = searchParams.get("file_url");
     const changedUrl = fileUrl.replace(/\//g, '@');
+    const [progress, setProgress] = useState(0);
     
 
     const videoRef = useRef(null);
@@ -77,33 +78,36 @@ const Files = () => {
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         try {
             const response = await axios.get(apiUrl+"/files/"+id, {
-                responseType: 'blob'
+                responseType: 'blob',
+                onDownloadProgress: (progressEvent) => {
+                    const total = progressEvent.total;
+                    const current = progressEvent.loaded;
+                    const percentage = Math.round((current / total) * 100);
+                    setProgress(percentage);
+                }
             });
 
-            console.log(response.headers['Content-Disposition']);
+            console.log(response.headers['content-disposition']);
       
             // 파일 이름 추출을 위한 Content-Disposition 헤더 분석
-            const contentDisposition = response.headers['Content-Disposition'];
-            let filename = 'downloaded-file';
-            if (contentDisposition) {
-                // 정확한 파일 이름 추출 로직
-                const filenameRegex = /filename\*=UTF-8''(.+)/;
-                const matches = filenameRegex.exec(contentDisposition);
-                if (matches != null && matches[1]) { 
-                // '+' 문자가 공백으로 인코딩되었을 경우를 위한 처리
-                filename = decodeURIComponent(matches[1].replace(/\+/g, ' '));
-                }
-            }
+            const contentDisposition = response.headers['content-disposition'];
+            const fileName = decodeURI(
+                    contentDisposition
+                            .match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)[1]
+                            .replace(/['"]/g, "")
+                            .slice(5)
+                    );
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', filename);
+            link.style.display = "none";
+            link.download = fileName;
             document.body.appendChild(link);
             link.click();
+            link.remove();
 
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
+
             } catch (error) {
             console.error('Download error:', error);
             }
@@ -117,7 +121,16 @@ const Files = () => {
             ) : (
                 <img ref={imageRef} style={{ height: "400px" }}/>
             )}
-            <button onClick={downloadFile}>Download</button>
+            <div>
+                <button onClick={downloadFile}>Download</button>
+                {progress > 0 && (
+                    <div>
+                        <p>Download Progress: {progress}%</p>
+                        <progress value={progress} max="100">{progress}%</progress>
+                    </div>
+                )}
+            </div>
+            
         </div>
         
         
