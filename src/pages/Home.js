@@ -460,7 +460,7 @@ const Home = () => {
                             fileIcon
                         )} style={{ width: '40px', height: '40px', objectFit: "cover", marginRight: '10px' }} alt="item icon"/>
                     )}
-                    <a href={item.directory ? '/?url='+item.url : '/files?id='+item.id+'&is_music='+item.streamingMusic+'&is_video='+item.streamingVideo+'&file_url='+item.url}>{item.originalFileName}</a>
+                    <a href={item.directory ? '/?url='+item.url : '/files?id='+item.id}>{item.originalFileName}</a>
                     <div style={{ marginLeft: "auto"}}>
                         <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }} alt="edit icon"/>
                         <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }} alt="delete icon"/>
