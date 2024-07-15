@@ -20,6 +20,7 @@ const Home = () => {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [numberOfFiles, setNumberOfFiles] = useState(0);
     const [numberOfFolders, setNumberOfFolders] = useState(0);
+    const [idList, setIdList] = useState([]);
 
     const findDirectory = (data, targetUrl) => {
         if (data.url === targetUrl && data.directory) {
@@ -90,6 +91,11 @@ const Home = () => {
                 }
             });
     }, [url, userId, navigate]);
+
+    useEffect(() => {
+        const list = items.map(item => item.id);
+        setIdList(list);
+    }, [items])
 
     const handleFileChange = (event) => {
         setFile(event.target.files);
@@ -404,6 +410,15 @@ const Home = () => {
             })
     }
 
+    const goToFile = (item, idIndex) => {
+        if(item.directory){
+            navigate('/?url='+item.url);
+        }
+        else{
+            navigate('/files?id='+item.id, { state: { idIndex, idList }})
+        }
+    }
+
     return (
     <div style={{ marginLeft: "10px"}}>
         <div style={{ display: "flex" }}>
@@ -448,19 +463,21 @@ const Home = () => {
             <a href={'/?url='+parentUrl}>..</a>
             <hr style={{ width: '100%' }} />
         </div>
-        {items.map(item => (
+        {items.map((item, index) => (
             <div key={item.id}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px', marginTop: "5px" }}>
-                    { item.directory ? (
-                        <img src={folderIcon} style={{ width: '40px', height: '40px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
-                    ) : (
-                        <img src={item.hasThumbnail ? (
-                            apiUrl + "/streaming-thumbnail?path=" + item.url
+                    <div style={{ display: 'flex', alignItems: 'center' }} onClick={() => goToFile(item, index)}>
+                        { item.directory ? (
+                            <img src={folderIcon} style={{ width: '40px', height: '40px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
                         ) : (
-                            fileIcon
-                        )} style={{ width: '40px', height: '40px', objectFit: "cover", marginRight: '10px' }} alt="item icon"/>
-                    )}
-                    <a href={item.directory ? '/?url='+item.url : '/files?id='+item.id}>{item.originalFileName}</a>
+                            <img src={item.hasThumbnail ? (
+                                apiUrl + "/streaming-thumbnail?path=" + item.url
+                            ) : (
+                                fileIcon
+                            )} style={{ width: '40px', height: '40px', objectFit: "cover", marginRight: '10px' }} alt="item icon"/>
+                        )}
+                        <p>{item.originalFileName}</p>
+                    </div>
                     <div style={{ marginLeft: "auto"}}>
                         <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }} alt="edit icon"/>
                         <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }} alt="delete icon"/>

@@ -1,12 +1,13 @@
 import axios from 'axios';
 import React, { useState, useEffect, Component, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import Hls from 'hls.js';
 
 const Files = () => {
 
     const apiUrl = process.env.REACT_APP_API_URL;
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const userId = localStorage.getItem("userId")
     const id = searchParams.get("id");
@@ -15,13 +16,13 @@ const Files = () => {
     const [fileUrl, setFileUrl] = useState(null);
     const [changedUrl, setChangedUrl] = useState(null);
     const [progress, setProgress] = useState(0);
+    let { idIndex, idList } = location.state;
     
 
     const videoRef = useRef(null);
     const imageRef = useRef(null);
 
     useEffect(() => {
-
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         axios.get(apiUrl + "/files/" + id)
             .then(response => {
@@ -30,7 +31,7 @@ const Files = () => {
                 setIsVideo(response.data.streamingVideo);
                 setFileUrl(response.data.url);
             })
-    }, []);
+    }, [id]);
 
     useEffect(() => {
         if(fileUrl){
@@ -130,6 +131,22 @@ const Files = () => {
             console.error('Download error:', error);
             }
     }
+
+    const goToOtherFile = (next) => {
+
+        if(next){
+            if(idIndex+1 !== idList.length){
+                idIndex += 1;
+                navigate('/files?id='+(parseInt(id) + 1), { state: { idIndex, idList }, replace: true});
+            }
+        }
+        else{
+            if(idIndex !== 0){
+                idIndex -= 1;
+                navigate('/files?id='+(parseInt(id) - 1), { state: { idIndex, idList }, replace: true});
+            }
+        }
+    }
     
 
     return (
@@ -139,6 +156,10 @@ const Files = () => {
             ) : (
                 <img ref={imageRef} style={{ height: "400px" }}/>
             )}
+            <div style={{ display: 'flex'}}>
+                <button onClick={() => goToOtherFile(false)}>&lt;-</button>
+                <button onClick={() => goToOtherFile(true)}>-&gt;</button>
+            </div>
             <div>
                 <button onClick={downloadFile}>Download</button>
                 {progress > 0 && (
