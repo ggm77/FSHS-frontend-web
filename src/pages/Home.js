@@ -43,6 +43,7 @@ const Home = () => {
     };
 
     useEffect(() => {
+        localStorage.setItem('scrollPosition', 0);
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         axios.get(apiUrl + "/files")
             .then(response => {
