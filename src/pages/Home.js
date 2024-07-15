@@ -419,6 +419,10 @@ const Home = () => {
         }
     }
 
+    const goToPreviousFolder = () => {
+        navigate('/?url='+parentUrl);
+    }
+
     return (
     <div style={{ marginLeft: "10px"}}>
         <div style={{ display: "flex" }}>
@@ -429,14 +433,12 @@ const Home = () => {
                 <button onClick={() => createFolder(url)} style={{ width: "70px", height: "35px"}}>New Folder</button>
             </div>
         </div>
-        <div>
         <h3>Selected Files:</h3>
         <ul>
           {Array.from(file).map((f, index) => (
             <li key={index}>{f.name}</li>
           ))}
         </ul>
-      </div>
         <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
         <div style={{ display: "flex"}}>
             <p>{numberOfFolders} folders, {numberOfFiles} files</p>
@@ -459,14 +461,16 @@ const Home = () => {
         )}
         <div>
             <hr style={{ width: '100%' }} />
-            <img src={folderIcon} style={{ width: '40px', height: '40px', marginRight: '10px' }} alt="folder icon"/>
-            <a href={'/?url='+parentUrl}>..</a>
+            <div style={{ display: 'flex', cursor: "pointer"}} onClick={goToPreviousFolder}>
+                <img src={folderIcon} style={{ width: '40px', height: '40px', marginRight: '10px' }} alt="folder icon"/>
+                <p style={{ marginBottom: '0'}}>..</p>
+            </div>
             <hr style={{ width: '100%' }} />
         </div>
         {items.map((item, index) => (
             <div key={item.id}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '5px', marginTop: "5px" }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }} onClick={() => goToFile(item, index)}>
+                    <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => goToFile(item, index)}>
                         { item.directory ? (
                             <img src={folderIcon} style={{ width: '40px', height: '40px', objectFit: "contain", marginRight: '10px' }} alt="item icon"/>
                         ) : (
@@ -479,8 +483,8 @@ const Home = () => {
                         <p>{item.originalFileName}</p>
                     </div>
                     <div style={{ marginLeft: "auto"}}>
-                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px" }} alt="edit icon"/>
-                        <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px" }} alt="delete icon"/>
+                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="edit icon"/>
+                        <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="delete icon"/>
                     </div>        
                 </div>
                 <hr style={{ width: '100%', margin: '0' }} />
