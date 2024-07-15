@@ -77,7 +77,7 @@ const Files = () => {
 
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         try {
-            const response = await axios.get(apiUrl+"/files/"+id, {
+            const response = await axios.get(apiUrl+"/files/"+id+"/download", {
                 responseType: 'blob',
                 onDownloadProgress: (progressEvent) => {
                     const total = progressEvent.total;
