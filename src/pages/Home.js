@@ -23,7 +23,7 @@ const Home = () => {
     const [idList, setIdList] = useState([]);
     const [scrollPosition, setScrollPosition] = useState(0);
     const [finish, setFinish] = useState(false);
-    const [moved, setMoved] = useState(false);
+    const [isDelayOver, setIsDelayOver] = useState(false);
 
     const findDirectory = (data, targetUrl) => {
         if (data.url === targetUrl && data.directory) {
@@ -43,7 +43,6 @@ const Home = () => {
     };
 
     useEffect(() => {
-        localStorage.setItem('scrollPosition', 0);
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         axios.get(apiUrl + "/files")
             .then(response => {
@@ -98,13 +97,21 @@ const Home = () => {
     }, [url, userId, navigate]);
 
     useEffect(() => {
+        const delay = setTimeout(() => {
+          setIsDelayOver(true);
+        }, 1000); // 3초 동안 지연
+    
+        return () => clearTimeout(delay); // 컴포넌트가 언마운트될 때 타이머 정리
+      }, []);
+
+    useEffect(() => {
         const list = items.map(item => item.id);
         setIdList(list);
     }, [items])
 
     useEffect(() => {
         // 스크롤 위치를 로컬 스토리지에 저장
-        if (finish && moved) {
+        if (finish && isDelayOver) {
           localStorage.setItem('scrollPosition', scrollPosition);
         }
       }, [scrollPosition, finish]);
@@ -116,7 +123,6 @@ const Home = () => {
             const savedScrollPosition = localStorage.getItem('scrollPosition');
             if (savedScrollPosition) {
                 window.scrollTo(0, parseInt(savedScrollPosition, 10));
-                setMoved(true);
             }
         }
     }, [finish]);
