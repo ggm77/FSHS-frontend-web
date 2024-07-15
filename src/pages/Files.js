@@ -156,9 +156,9 @@ const Files = () => {
             ) : (
                 <img ref={imageRef} style={{ height: "400px" }}/>
             )}
-            <div style={{ display: 'flex'}}>
-                <button onClick={() => goToOtherFile(false)}>&lt;-</button>
-                <button onClick={() => goToOtherFile(true)}>-&gt;</button>
+            <div style={{ display: 'flex', alignItems: "center", justifyContent: 'center'}}>
+                <button onClick={() => goToOtherFile(false)} style={{ width: "70px", height: "30px"}}>&lt;-</button>
+                <button onClick={() => goToOtherFile(true)} style={{ width: "70px", height: "30px"}}>-&gt;</button>
             </div>
             <div>
                 <button onClick={downloadFile}>Download</button>
