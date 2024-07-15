@@ -21,6 +21,9 @@ const Home = () => {
     const [numberOfFiles, setNumberOfFiles] = useState(0);
     const [numberOfFolders, setNumberOfFolders] = useState(0);
     const [idList, setIdList] = useState([]);
+    const [scrollPosition, setScrollPosition] = useState(0);
+    const [finish, setFinish] = useState(false);
+    const [moved, setMoved] = useState(false);
 
     const findDirectory = (data, targetUrl) => {
         if (data.url === targetUrl && data.directory) {
@@ -56,6 +59,7 @@ const Home = () => {
                 setNumberOfFolders(folderData.length);
 
                 setItems([...folderData, ...fileData]);
+                setFinish(true);
             })
             .catch(error => {
                 console.error(error);
@@ -96,6 +100,36 @@ const Home = () => {
         const list = items.map(item => item.id);
         setIdList(list);
     }, [items])
+
+    useEffect(() => {
+        // 스크롤 위치를 로컬 스토리지에 저장
+        if (finish && moved) {
+          localStorage.setItem('scrollPosition', scrollPosition);
+        }
+      }, [scrollPosition, finish]);
+
+    
+    useEffect(() => {
+        // 저장된 스크롤 위치로 이동
+        if(finish){
+            const savedScrollPosition = localStorage.getItem('scrollPosition');
+            if (savedScrollPosition) {
+                window.scrollTo(0, parseInt(savedScrollPosition, 10));
+                setMoved(true);
+            }
+        }
+    }, [finish]);
+
+    useEffect(() => {
+        if (finish) {
+          window.addEventListener('scroll', handleScroll);
+        }
+    
+        // 컴포넌트가 언마운트되거나 작업 완료 상태가 변경될 때 스크롤 이벤트 리스너 제거
+        return () => {
+          window.removeEventListener('scroll', handleScroll);
+        };
+      }, [finish]);
 
     const handleFileChange = (event) => {
         setFile(event.target.files);
@@ -422,6 +456,10 @@ const Home = () => {
     const goToPreviousFolder = () => {
         navigate('/?url='+parentUrl);
     }
+
+    const handleScroll = () => {
+        setScrollPosition(window.scrollY);
+      };
 
     return (
     <div style={{ marginLeft: "10px"}}>
