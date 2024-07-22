@@ -99,7 +99,7 @@ const Home = () => {
     useEffect(() => {
         const delay = setTimeout(() => {
           setIsDelayOver(true);
-        }, 1000); // 3초 동안 지연
+        }, 3000); // 3초 동안 지연
     
         return () => clearTimeout(delay); // 컴포넌트가 언마운트될 때 타이머 정리
       }, []);
