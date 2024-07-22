@@ -14,6 +14,7 @@ const Files = () => {
     const [isMusic, setIsMusic] = useState(null);
     const [isVideo, setIsVideo] = useState(null);
     const [fileUrl, setFileUrl] = useState(null);
+    const [fileInfo, setFileInfo] = useState("loading..");
     const [changedUrl, setChangedUrl] = useState(null);
     const [progress, setProgress] = useState(0);
     let { idIndex, idList } = location.state;
@@ -26,7 +27,7 @@ const Files = () => {
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
         axios.get(apiUrl + "/files/" + id)
             .then(response => {
-
+                setFileInfo(response.data);
                 setIsMusic(response.data.streamingMusic);
                 setIsVideo(response.data.streamingVideo);
                 setFileUrl(response.data.url);
@@ -156,6 +157,7 @@ const Files = () => {
             ) : (
                 <img ref={imageRef} style={{ height: "400px" }}/>
             )}
+            <h3>{fileInfo.originalFileName}</h3>
             <div style={{ display: 'flex', alignItems: "center", justifyContent: 'center'}}>
                 <button onClick={() => goToOtherFile(false)} style={{ width: "70px", height: "30px"}}>&lt;-</button>
                 <button onClick={() => goToOtherFile(true)} style={{ width: "70px", height: "30px"}}>-&gt;</button>
