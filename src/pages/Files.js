@@ -137,13 +137,13 @@ const Files = () => {
         if(next){
             if(idIndex+1 !== idList.length){
                 idIndex += 1;
-                navigate('/files?id='+(parseInt(id) + 1), { state: { idIndex, idList }, replace: true});
+                navigate('/files?id='+(idList[idIndex]), { state: { idIndex, idList }, replace: true});
             }
         }
         else{
             if(idIndex !== 0){
                 idIndex -= 1;
-                navigate('/files?id='+(parseInt(id) - 1), { state: { idIndex, idList }, replace: true});
+                navigate('/files?id='+(idList[idIndex]), { state: { idIndex, idList }, replace: true});
             }
         }
     }
