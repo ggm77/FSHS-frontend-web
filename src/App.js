@@ -4,6 +4,7 @@ import RequireAuth from './RequireAuth'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Files from './pages/Files'
+import MyPage from './pages/MyPage';
 
 function App() {
   return (
@@ -23,6 +24,14 @@ function App() {
           element={
             <RequireAuth>
               <Files />
+            </RequireAuth>
+          } 
+        />
+        <Route 
+          path="/mypage" 
+          element={
+            <RequireAuth>
+              <MyPage />
             </RequireAuth>
           } 
         />

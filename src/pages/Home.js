@@ -468,14 +468,19 @@ const Home = () => {
         setScrollPosition(window.scrollY);
       };
 
+    const goToMyPage = () => {
+        navigate('/mypage');
+    }
+
     return (
     <div style={{ marginLeft: "10px"}}>
         <div style={{ display: "flex" }}>
             <img src={logo} style={{height: "35px", marginTop: "27px", marginLeft: "5px"}} alt="logo"/>
             <div style={{ marginLeft: "auto", marginTop: "27px"}}>
                 <input type="file" multiple onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
-                <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload File</button>
-                <button onClick={() => createFolder(url)} style={{ width: "70px", height: "35px"}}>New Folder</button>
+                <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload</button>
+                <button onClick={() => createFolder(url)} style={{ width: "78px", height: "35px"}}>NewFolder</button>
+                <button onClick={() => goToMyPage()} style={{ width: "70px", height: "35px"}}>MyPage</button>
             </div>
         </div>
         <h3>Selected Files:</h3>
