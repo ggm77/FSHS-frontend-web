@@ -18,16 +18,18 @@ const Login = () => {
     const [userName, setUserName] = useState('')
     const [signUpUserEmail, setSignUpUserEamil] = useState('');
     const [signUpUserPassword, setSignUpUserPassword] = useState('');
-    const signUpData = {userName, signUpUserEmail, signUpUserPassword}
 
-    const [userEmail, setUserEmail] = useState('');
-    const [userPassword, setUserPassword] = useState('');
-    const signInData = {userEmail,userPassword}
+    const [signInUserEmail, setSignInUserEmail] = useState('');
+    const [signInUserPassword, setSignInUserPassword] = useState('');
 
     // 폼 제출 처리
     const handleSignInSubmit = (event) => {
         event.preventDefault(); // 폼 제출 시 페이지 리로드 방지
         // 로그인 로직을 여기에 구현하세요. 예: API 호출
+
+        const userEmail = signInUserEmail;
+        const userPassword = signInUserPassword;
+        const signInData = {userEmail, userPassword};
 
         axios.post(apiUrl + "/auth/sign-in", signInData)
             .then(response => {
@@ -52,6 +54,10 @@ const Login = () => {
     const handleSignUpSubmit = (event) => {
         event.preventDefault(); // 폼 제출 시 페이지 리로드 방지
         // 로그인 로직을 여기에 구현하세요. 예: API 호출
+
+        const userEmail = signUpUserEmail;
+        const userPassword = signUpUserPassword;
+        const signUpData = {userName, userEmail, userPassword};
 
         axios.post(apiUrl + "/auth/sign-up", signUpData)
             .then(response => {
@@ -81,11 +87,11 @@ const Login = () => {
     };
 
     const handleEmailChange = (event) => {
-        setUserEmail(event.target.value);
+        setSignInUserEmail(event.target.value);
     };
 
     const handlePasswordChange = (event) => {
-        setUserPassword(event.target.value);
+        setSignInUserPassword(event.target.value);
     };
 
     return (
@@ -98,7 +104,7 @@ const Login = () => {
                     <input
                         type="text"
                         id="userEmail"
-                        value={userEmail}
+                        value={signInUserEmail}
                         onChange={handleEmailChange}
                         required
                     />
@@ -108,7 +114,7 @@ const Login = () => {
                     <input
                         type="password"
                         id="userPassword"
-                        value={userPassword}
+                        value={signInUserPassword}
                         onChange={handlePasswordChange}
                         required
                     />
@@ -120,7 +126,7 @@ const Login = () => {
                 <form onSubmit={handleSignUpSubmit}>
                     <h2>회원가입</h2>
                     <div className="form-group">
-                    <label htmlFor="userEmail">이름:</label>
+                    <label htmlFor="userName">이름:</label>
                     <input
                         type="text"
                         id="userName"
@@ -130,20 +136,20 @@ const Login = () => {
                     />
                     </div>
                     <div className="form-group">
-                    <label htmlFor="userEmail">이메일:</label>
+                    <label htmlFor="signUpUserEmail">이메일:</label>
                     <input
                         type="email"
-                        id="userEmail"
+                        id="signUpUserEmail"
                         value={signUpUserEmail}
                         onChange={handleSignUpUserEmailChange}
                         required
                     />
                     </div>
                     <div className="form-group">
-                    <label htmlFor="userPassword">비밀번호:</label>
+                    <label htmlFor="signUpUserPassword">비밀번호:</label>
                     <input
                         type="password"
-                        id="userPassword"
+                        id="signUpUserPassword"
                         value={signUpUserPassword}
                         onChange={handleSignUpUserPasswordChange}
                         required
