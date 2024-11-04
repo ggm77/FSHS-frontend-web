@@ -8,14 +8,14 @@ import fileIcon from '../assets/fileIcon.png';
 import logo from '../assets/logo.png';
 
 const Home = () => {
-
+    
     const apiUrl = process.env.REACT_APP_API_URL;
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const userId = localStorage.getItem("userId")
     const [items, setItems] = useState([]);
-    const url = searchParams.get("url");
-    const parentUrl = url ? (url.substring(0, url.lastIndexOf('/'))) : "";
+    const [id, setId] = useState(searchParams.get("id"));
+    const [parentId, setParentId] = useState(0);
     const [file, setFile] = useState([]);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [numberOfFiles, setNumberOfFiles] = useState(0);
@@ -25,35 +25,28 @@ const Home = () => {
     const [finish, setFinish] = useState(false);
     const [isDelayOver, setIsDelayOver] = useState(false);
 
-    const findDirectory = (data, targetUrl) => {
-        if (data.url === targetUrl && data.directory) {
-          return data.children;
+    useEffect(() => {
+        if(searchParams.get("id")){
+            setId(searchParams.get("id"));
         }
-    
-        if (data.children && data.children.length > 0) {
-          for (const child of data.children) {
-            const found = findDirectory(child, targetUrl);
-            if (found) {
-              return found;
-            }
-          }
+        else{
+            setId(userId);
         }
-    
-        return null;
-    };
+    }, [searchParams.get("id")])
 
     useEffect(() => {
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-        axios.get(apiUrl + "/files")
+        axios.get(id ? apiUrl + "/files/" + id : apiUrl + "/files/" + userId)
             .then(response => {
                 console.log(response.data);
     
-                const directory = findDirectory(response.data, url ? url : "/" + userId);
-                const data = Array.isArray(directory) ? directory : [directory].filter(Boolean);
+                const data = response.data.children;
                 
 
                 const folderData = data.filter(data => data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
                 const fileData = data.filter(data => !data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
+
+                setParentId(response.data.parentId);
 
                 setNumberOfFiles(fileData.length);
                 setNumberOfFolders(folderData.length);
@@ -70,18 +63,21 @@ const Home = () => {
                             localStorage.setItem('refreshToken', response.data.refreshToken);
                             
                             axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                            axios.get(apiUrl + "/files")
+                            axios.get(apiUrl + "/files/" + id)
                                 .then(response => {
                                     console.log(response.data);
-
-                                    const directory = findDirectory(response.data, url ? url : "/" + userId);
-                                    const data = Array.isArray(directory) ? directory : [directory].filter(Boolean);
+    
+                                    const data = response.data.children;
                                     
 
                                     const folderData = data.filter(data => data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
                                     const fileData = data.filter(data => !data.directory).sort((a, b) => a.originalFileName.localeCompare(b.originalFileName));
 
+                                    setNumberOfFiles(fileData.length);
+                                    setNumberOfFolders(folderData.length);
+
                                     setItems([...folderData, ...fileData]);
+                                    setFinish(true);
                                 })
                                 .catch(error => {
                                     console.error(error);
@@ -94,7 +90,7 @@ const Home = () => {
                         });
                 }
             });
-    }, [url, userId, navigate]);
+    }, [id, userId, navigate]);
 
     useEffect(() => {
         const delay = setTimeout(() => {
@@ -153,12 +149,11 @@ const Home = () => {
             formData.append('files', f);
         }
         formData.append('info', JSON.stringify({
-            "path":url === null || url === "" || url === "/"+userId ? "/" : url.substring(userId.length+1)+"/",
             "secrete":false
         }))
 
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-        axios.post(apiUrl+"/files", formData, {
+        axios.post(apiUrl+"/files/" + id, formData, {
             onUploadProgress: progressEvent => {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                 setUploadProgress(percentCompleted);
@@ -180,7 +175,7 @@ const Home = () => {
                             localStorage.setItem('refreshToken', response.data.refreshToken);
     
                             axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                            axios.post(apiUrl + "/files", formData, {
+                            axios.post(apiUrl + "/files/" + id, formData, {
                                 onUploadProgress: progressEvent => {
                                     const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                                     setUploadProgress(percentCompleted);
@@ -213,12 +208,12 @@ const Home = () => {
 
     }
 
-    const deleteFile = (id, isDirectory, originalFileName) => {
+    const deleteFile = (fileId, isDirectory, originalFileName) => {
         if(window.confirm("정말로 '"+ originalFileName +"'을(를) 삭제하시겠습니까?")){
             axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
 
             if(isDirectory){
-                axios.delete(apiUrl+"/folder/"+id)
+                axios.delete(apiUrl+"/folder/"+fileId)
                 .then(response => {
                     if(response.status === 204){
                         alert("삭제 완료")
@@ -234,7 +229,7 @@ const Home = () => {
                                 localStorage.setItem('refreshToken', response.data.refreshToken);
         
                                 axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                axios.delete(apiUrl + "/folder/" + id)
+                                axios.delete(apiUrl + "/folder/" + fileId)
                                     .then(response => {
                                         if(response.status === 204){
                                             alert("삭제 완료");
@@ -258,7 +253,7 @@ const Home = () => {
 
                 })
             } else{
-                axios.delete(apiUrl+"/files/"+id)
+                axios.delete(apiUrl+"/files/"+fileId)
                     .then(response => {
                         if(response.status === 204){
                             alert("삭제 완료")
@@ -274,7 +269,7 @@ const Home = () => {
                                     localStorage.setItem('refreshToken', response.data.refreshToken);
             
                                     axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                    axios.delete(apiUrl + "/files/" + id)
+                                    axios.delete(apiUrl + "/files/" + fileId)
                                         .then(response => {
                                             if(response.status === 204){
                                                 alert("삭제 완료");
@@ -301,19 +296,17 @@ const Home = () => {
         }
     }
 
-    const updateFile = (id, isDirectory, url, fileExtension) => {
+    const updateFile = (fileId, isDirectory, fileExtension) => {
         
         if(isDirectory){
-            const changedUrl = url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)+"/"
-            const inputValue = prompt("새로운 이름을 입력하세요:")
-            const path = changedUrl + inputValue;
-            const data = {path};
+            const folderName = prompt("새로운 이름을 입력하세요:")
+            const data = {folderName};
 
-            if(inputValue === null){
+            if(folderName === null){
                 return ;
             }
 
-            axios.patch(apiUrl+"/folder/"+id, data)
+            axios.patch(apiUrl+"/folder/"+fileId, data)
                     .then(response => {
                         if(response.status === 200){
                             alert("수정 완료")
@@ -329,7 +322,7 @@ const Home = () => {
                                     localStorage.setItem('refreshToken', response.data.refreshToken);
             
                                     axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                    axios.patch(apiUrl + "/folder/"+id, data)
+                                    axios.patch(apiUrl + "/folder/"+fileId, data)
                                         .then(response => {
                                             if(response.status === 200){
                                                 alert("수정 완료");
@@ -364,7 +357,7 @@ const Home = () => {
 
             const originalFileName = newName+"."+fileExtension;
             const data = {originalFileName};
-            axios.patch(apiUrl+"/files/"+id, data)
+            axios.patch(apiUrl+"/files/"+fileId, data)
                     .then(response => {
                         if(response.status === 200){
                             alert("수정 완료")
@@ -380,7 +373,7 @@ const Home = () => {
                                     localStorage.setItem('refreshToken', response.data.refreshToken);
             
                                     axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                                    axios.patch(apiUrl + "/files/"+id, data)
+                                    axios.patch(apiUrl + "/files/"+fileId, data)
                                         .then(response => {
                                             if(response.status === 200){
                                                 alert("수정 완료");
@@ -405,12 +398,12 @@ const Home = () => {
         }
     }
 
-    const createFolder = (url) => {
-        const path = (url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)+"/") + prompt("새로운 이름을 입력하세요:");
-        const data = {path};
+    const createFolder = () => {
+        const folderName = prompt("새로운 이름을 입력하세요:");
+        const data = {folderName};
 
         axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-        axios.post(apiUrl+"/folder", data)
+        axios.post(apiUrl+"/folder/" + id, data)
             .then(response => {
                 if(response.status === 201){
                     alert("폴더 생성 성공");
@@ -427,7 +420,7 @@ const Home = () => {
                             localStorage.setItem('refreshToken', response.data.refreshToken);
     
                             axios.defaults.headers.common["Authorization"] = 'Bearer ' + localStorage.getItem("accessToken");
-                            axios.post(apiUrl + "/folder", data)
+                            axios.post(apiUrl + "/folder/" + id, data)
                                 .then(response => {
                                     if(response.status === 201){
                                         alert("폴더 생성 성공");
@@ -453,7 +446,7 @@ const Home = () => {
 
     const goToFile = (item, idIndex) => {
         if(item.directory){
-            navigate('/?url='+item.url);
+            navigate('/?id='+item.id);
         }
         else{
             navigate('/files?id='+item.id, { state: { idIndex, idList }})
@@ -461,7 +454,7 @@ const Home = () => {
     }
 
     const goToPreviousFolder = () => {
-        navigate('/?url='+parentUrl);
+        navigate('/?id='+parentId);
     }
 
     const handleScroll = () => {
@@ -479,7 +472,7 @@ const Home = () => {
             <div style={{ marginLeft: "auto", marginTop: "27px"}}>
                 <input type="file" multiple onChange={handleFileChange} style={{ width: "230px", height: "35px"}}/>
                 <button onClick={handleUpload} style={{ width: "70px", height: "35px"}}>Upload</button>
-                <button onClick={() => createFolder(url)} style={{ width: "78px", height: "35px"}}>NewFolder</button>
+                <button onClick={() => createFolder()} style={{ width: "78px", height: "35px"}}>NewFolder</button>
                 <button onClick={() => goToMyPage()} style={{ width: "70px", height: "35px"}}>MyPage</button>
             </div>
         </div>
@@ -489,7 +482,7 @@ const Home = () => {
             <li key={index}>{f.name}</li>
           ))}
         </ul>
-        <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p>
+        {/* <p style={{fontSize: "23px"}}>{url === null || url === "" || url === "/"+userId? "/" : url.substring(userId.length+1)}</p> */}
         <div style={{ display: "flex"}}>
             <p>{numberOfFolders} folders, {numberOfFiles} files</p>
         </div>
@@ -533,7 +526,7 @@ const Home = () => {
                         <p>{item.originalFileName}</p>
                     </div>
                     <div style={{ marginLeft: "auto"}}>
-                        <img src={pen} onClick={() => updateFile(item.id, item.directory, url, item.fileExtension)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="edit icon"/>
+                        <img src={pen} onClick={() => updateFile(item.id, item.directory, item.fileExtension)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="edit icon"/>
                         <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="delete icon"/>
                     </div>        
                 </div>
