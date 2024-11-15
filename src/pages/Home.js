@@ -296,7 +296,7 @@ const Home = () => {
         }
     }
 
-    const updateFile = (fileId, isDirectory, fileExtension) => {
+    const updateFile = (fileId, isDirectory) => {
         
         if(isDirectory){
             const folderName = prompt("새로운 이름을 입력하세요:")
@@ -345,18 +345,17 @@ const Home = () => {
                         }
                     })
         } else{
-            const newName = prompt("새로운 이름을 입력하세요:");
+            const newFileName = prompt("새로운 이름을 입력하세요:");
 
-            if(newName === null){
+            if(newFileName === null){
                 return ;
             }
-            if(newName.includes('.')){
+            if(newFileName.includes('.')){
                 alert("이름에 '.'은 들어갈 수 없습니다.");
                 return ;
             }
 
-            const originalFileName = newName+"."+fileExtension;
-            const data = {originalFileName};
+            const data = {newFileName};
             axios.patch(apiUrl+"/files/"+fileId, data)
                     .then(response => {
                         if(response.status === 200){
@@ -526,7 +525,7 @@ const Home = () => {
                         <p>{item.originalFileName}</p>
                     </div>
                     <div style={{ marginLeft: "auto"}}>
-                        <img src={pen} onClick={() => updateFile(item.id, item.directory, item.fileExtension)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="edit icon"/>
+                        <img src={pen} onClick={() => updateFile(item.id, item.directory)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="edit icon"/>
                         <img src={trashcan} onClick={() => deleteFile(item.id, item.directory, item.originalFileName)} style={{ height: "30px", marginRight: "10px", cursor: 'pointer' }} alt="delete icon"/>
                     </div>        
                 </div>
