@@ -67,15 +67,20 @@ const Files = () => {
                         .then(async response => {
                             let blob = response.data;
 
-                            if(!supportsHeic() && fileUrl.toLowerCase().endsWith("heic")){
-                                blob = await heic2any({
-                                    blob,
-                                    toType: "image/jpeg",
-                                    quality: 0.9,
-                                });
+                            try {
+                                if(!supportsHeic() && fileUrl.toLowerCase().endsWith("heic")){
+                                    blob = await heic2any({
+                                        blob,
+                                        toType: "image/jpeg",
+                                        quality: 0.9,
+                                    });
+                                }
+                                
+                                setImg(URL.createObjectURL(blob));
+                            } catch (e) {
+                                console.warn("HEIC conversion fail : ", e);
+                                setImg(URL.createObjectURL(blob));
                             }
-                            
-                            setImg(URL.createObjectURL(blob));
                         })
                         .catch(error => {
                             if(error.response && error.response.status === 403) {
