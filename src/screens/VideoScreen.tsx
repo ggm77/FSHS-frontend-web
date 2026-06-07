@@ -26,6 +26,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
   const [useStream, setUseStream] = useState(false);
   const [streamStart, setStreamStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
     setUseStream(false);
     setDuration(0);
     setStreamStart(0);
+    setWaiting(false);
   }, [fileId]);
 
   useEffect(() => {
@@ -116,7 +118,21 @@ export function VideoScreen({ fileId, onBack }: Props) {
               }
             }}
             onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
+            onPause={() => {
+              setPlaying(false);
+              setWaiting(false);
+            }}
+            onEnded={() => {
+              setPlaying(false);
+              setWaiting(false);
+            }}
+            onWaiting={() => setWaiting(true)}
+            onPlaying={() => setWaiting(false)}
+            onSeeking={() => setWaiting(true)}
+            onSeeked={() => setWaiting(false)}
+            onCanPlay={() => setWaiting(false)}
+            onLoadStart={() => setWaiting(true)}
+            onLoadedData={() => setWaiting(false)}
             onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
             onError={() => {
               const mediaError = videoRef.current?.error;
@@ -132,6 +148,12 @@ export function VideoScreen({ fileId, onBack }: Props) {
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <Icon name="spinner" size={28} />
             <span>비디오 정보 불러오는 중...</span>
+          </div>
+        )}
+
+        {playing && waiting && (
+          <div className="video-buffering-overlay">
+            <Icon name="spinner" size={32} color="#fff" className="spin-icon" />
           </div>
         )}
 
@@ -348,4 +370,28 @@ const videoStyles = `
   }
   .pbtn.play:hover{opacity:1}
   .player-row .stretch{flex:1}
+  .video-buffering-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    border: .5px solid rgba(255, 255, 255, 0.15);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    z-index: 8;
+    pointer-events: none;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .spin-icon {
+    animation: spin 1s linear infinite;
+  }
 `;
