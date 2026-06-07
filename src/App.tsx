@@ -158,6 +158,35 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
+    // Initialize history state on mount
+    if (!window.history.state) {
+      window.history.replaceState({ screen: 'files' }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state && state.type === 'video') {
+        setVideoFileId(state.fileId);
+        setScreen('video');
+      } else if (state && state.type === 'viewer') {
+        setViewerFileId(state.fileId);
+        setScreen('viewer');
+      } else if (state && state.screen) {
+        setScreen(state.screen);
+        setVideoFileId(null);
+        setViewerFileId(null);
+      } else {
+        setScreen('files');
+        setVideoFileId(null);
+        setViewerFileId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -217,16 +246,29 @@ export default function App() {
   function handleNav(id: string) {
     if (id === 'logout') { handleLogout(); return; }
     setScreen(id as Screen);
+    window.history.replaceState({ screen: id }, '');
   }
 
   function openVideo(fileId: number) {
     setVideoFileId(fileId);
     setScreen('video');
+    window.history.pushState({ type: 'video', fileId, fromScreen: screen }, '');
   }
 
   function openViewer(fileId: number) {
     setViewerFileId(fileId);
     setScreen('viewer');
+    window.history.pushState({ type: 'viewer', fileId, fromScreen: screen }, '');
+  }
+
+  function handleBack() {
+    if (window.history.state && (window.history.state.type === 'video' || window.history.state.type === 'viewer')) {
+      window.history.back();
+    } else {
+      setScreen('files');
+      setVideoFileId(null);
+      setViewerFileId(null);
+    }
   }
 
   if (!authed) {
@@ -236,7 +278,7 @@ export default function App() {
   if (screen === 'video') {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
-        <VideoScreen fileId={videoFileId} onBack={() => setScreen('files')} />
+        <VideoScreen fileId={videoFileId} onBack={handleBack} />
       </div>
     );
   }
@@ -244,7 +286,7 @@ export default function App() {
   if (screen === 'viewer') {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#0f1015' }}>
-        <ViewerScreen fileId={viewerFileId} onBack={() => setScreen('files')} />
+        <ViewerScreen fileId={viewerFileId} onBack={handleBack} />
       </div>
     );
   }
