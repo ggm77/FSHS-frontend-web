@@ -165,7 +165,6 @@ export function VideoScreen({ fileId, onBack }: Props) {
           <video
             ref={videoRef}
             src={videoSrc}
-            crossOrigin="use-credentials"
             playsInline
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
