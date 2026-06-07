@@ -309,8 +309,8 @@ export default function App() {
         {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
         {screen === 'sync'    && <SyncScreen />}
         {screen === 'share'   && <ShareScreen />}
-        {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} />}
-        {screen === 'settings'&& <UsersScreen currentUserId={user?.id ?? null} />}
+        {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
+        {screen === 'settings'&& <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
         {screen === 'admin'   && <AdminScreen />}
       </main>
     </div>
