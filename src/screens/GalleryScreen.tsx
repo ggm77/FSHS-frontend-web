@@ -7,6 +7,7 @@ import type { FileResponseDto } from '../types';
 interface Props {
   rootFolderId: number | null;
   onOpenVideo: (fileId: number) => void;
+  onOpenFile: (fileId: number) => void;
 }
 
 interface DayGroup {
@@ -32,7 +33,7 @@ function formatDuration(ms: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function GalleryScreen({ rootFolderId, onOpenVideo }: Props) {
+export function GalleryScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [zoom, setZoom] = useState<'s' | 'm' | 'l'>('m');
   const [filter, setFilter] = useState<'all' | 'photo' | 'video'>('all');
   const [days, setDays] = useState<DayGroup[]>([]);
@@ -115,7 +116,7 @@ export function GalleryScreen({ rootFolderId, onOpenVideo }: Props) {
                 <div key={f.id}
                   className="gphoto"
                   style={{ background: 'var(--surface-2)', position: 'relative', overflow: 'hidden' }}
-                  onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id) : window.open(getFileContentUrl(f.id, false))}>
+                  onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id) : onOpenFile(f.id)}>
                   {f.category === 'IMAGE' ? (
                     <img
                       src={getFileContentUrl(f.id, false)}

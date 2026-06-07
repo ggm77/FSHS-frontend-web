@@ -7,6 +7,7 @@ import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from
 interface Props {
   rootFolderId: number | null;
   onOpenVideo: (fileId: number) => void;
+  onOpenFile: (fileId: number) => void;
 }
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -39,7 +40,7 @@ function formatDate(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-export function FilesScreen({ rootFolderId, onOpenVideo }: Props) {
+export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<{ id: number; name: string }[]>([]);
   const [view, setView] = useState<'list' | 'grid'>('list');
@@ -199,7 +200,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo }: Props) {
                 </div>
                 <div className="folder-grid">
                   {folder.folders.map((f) => (
-                    <div className="folder-card" key={f.id} onDoubleClick={() => navigateTo(f)}>
+                    <div className="folder-card" key={f.id} onClick={() => navigateTo(f)}>
                       <div className="fi"><Icon name="folder" size={21} color="var(--c-folder)" stroke={1.7} /></div>
                       <div className="txt">
                         <div className="nm">{f.name}</div>
@@ -241,10 +242,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo }: Props) {
                     {folder.files.map((f, i) => (
                       <div key={f.id}
                         className={'file-row' + (selected === i ? ' selected' : '')}
-                        onClick={() => setSelected(i)}
-                        onDoubleClick={() => {
+                        onClick={() => {
+                          setSelected(i);
                           if (f.category === 'VIDEO') onOpenVideo(f.id);
-                          else window.open(getFileContentUrl(f.id, true));
+                          else onOpenFile(f.id);
                         }}>
                         <div className="file-name">
                           <div className="file-thumb-sm">
@@ -273,9 +274,9 @@ export function FilesScreen({ rootFolderId, onOpenVideo }: Props) {
                   <div className="file-grid">
                     {folder.files.map((f) => (
                       <div className="grid-card" key={f.id}
-                        onDoubleClick={() => {
+                        onClick={() => {
                           if (f.category === 'VIDEO') onOpenVideo(f.id);
-                          else window.open(getFileContentUrl(f.id, true));
+                          else onOpenFile(f.id);
                         }}>
                         <div className="gc-head">
                           <FileIcon file={f} size={18} />

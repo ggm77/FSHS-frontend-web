@@ -5,6 +5,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { FilesScreen } from './screens/FilesScreen';
 import { GalleryScreen } from './screens/GalleryScreen';
 import { VideoScreen } from './screens/VideoScreen';
+import { ViewerScreen } from './screens/ViewerScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SyncScreen } from './screens/SyncScreen';
 import { ShareScreen } from './screens/ShareScreen';
@@ -14,7 +15,7 @@ import { logout } from './api/auth';
 import { getUser } from './api/users';
 import type { UserResponseDto } from './types';
 
-type Screen = 'files' | 'gallery' | 'video' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+type Screen = 'files' | 'gallery' | 'video' | 'viewer' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
 
 const NAV = [
   { group: '라이브러리', items: [
@@ -150,6 +151,7 @@ export default function App() {
   const [user, setUser] = useState<UserResponseDto | null>(null);
   const [_username, setUsername] = useState('');
   const [videoFileId, setVideoFileId] = useState<number | null>(null);
+  const [viewerFileId, setViewerFileId] = useState<number | null>(null);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -198,6 +200,11 @@ export default function App() {
     setScreen('video');
   }
 
+  function openViewer(fileId: number) {
+    setViewerFileId(fileId);
+    setScreen('viewer');
+  }
+
   if (!authed) {
     return <LoginScreen onSignIn={handleSignIn} />;
   }
@@ -206,6 +213,14 @@ export default function App() {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
         <VideoScreen fileId={videoFileId} onBack={() => setScreen('files')} />
+      </div>
+    );
+  }
+
+  if (screen === 'viewer') {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#0f1015' }}>
+        <ViewerScreen fileId={viewerFileId} onBack={() => setScreen('files')} />
       </div>
     );
   }
@@ -223,8 +238,8 @@ export default function App() {
           onToggleDark={() => setDark(v => !v)}
           onLogout={handleLogout}
         />
-        {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
-        {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
+        {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+        {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
         {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
         {screen === 'sync'    && <SyncScreen />}
         {screen === 'share'   && <ShareScreen />}
