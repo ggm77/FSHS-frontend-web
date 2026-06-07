@@ -250,7 +250,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
           </div>
         )}
 
-        {needsTranscoding && (
+        {needsTranscoding && !isFullscreen && (
           <div className="transcoding-hud">
             <div className="h">실시간 트랜스코딩 중</div>
             <div className="desc">
