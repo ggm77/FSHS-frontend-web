@@ -68,6 +68,24 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     loadFolder(rootFolderId, true);
   }, [rootFolderId]);
 
+  useEffect(() => {
+    const handlePop = (e: PopStateEvent) => {
+      const state = e.state;
+      if (!state) return;
+      
+      if (state.type === 'folder') {
+        setPath(state.path || []);
+        loadFolder(state.folderId);
+      } else if (state.screen === 'files') {
+        setPath([]);
+        if (rootFolderId != null) loadFolder(rootFolderId);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [rootFolderId]);
+
   async function loadFolder(folderId: number, reset = false) {
     setLoading(true);
     setError('');
@@ -83,17 +101,23 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   }
 
   function navigateTo(f: SimpleFolderResponseDto) {
-    setPath(prev => [...prev, { id: f.id, name: f.name }]);
+    const newPath = [...path, { id: f.id, name: f.name }];
+    setPath(newPath);
     loadFolder(f.id);
+    window.history.pushState({ type: 'folder', folderId: f.id, path: newPath }, '');
   }
 
   function navigateBreadcrumb(idx: number) {
     if (idx < 0) {
-      loadFolder(rootFolderId!, true);
+      setPath([]);
+      loadFolder(rootFolderId!);
+      window.history.pushState({ screen: 'files' }, '');
     } else {
       const newPath = path.slice(0, idx + 1);
+      const target = newPath[idx];
       setPath(newPath);
-      loadFolder(newPath[idx].id);
+      loadFolder(target.id);
+      window.history.pushState({ type: 'folder', folderId: target.id, path: newPath }, '');
     }
   }
 
