@@ -1,35 +1,243 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './styles.css';
+import { Icon } from './components/Icon';
+import { LoginScreen } from './screens/LoginScreen';
+import { FilesScreen } from './screens/FilesScreen';
+import { GalleryScreen } from './screens/GalleryScreen';
+import { VideoScreen } from './screens/VideoScreen';
+import { MusicScreen } from './screens/MusicScreen';
+import { SearchScreen } from './screens/SearchScreen';
+import { SyncScreen } from './screens/SyncScreen';
+import { ShareScreen } from './screens/ShareScreen';
+import { UsersScreen } from './screens/UsersScreen';
+import { AdminScreen } from './screens/AdminScreen';
+import { logout } from './api/auth';
+import { getUser } from './api/users';
+import type { UserResponseDto } from './types';
 
-function App() {
-  const [count, setCount] = useState(0)
+type Screen = 'files' | 'gallery' | 'video' | 'music' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
 
+const NAV = [
+  { group: '라이브러리', items: [
+    { id: 'files',   label: '파일',   icon: 'files' },
+    { id: 'gallery', label: '갤러리', icon: 'gallery' },
+    { id: 'video',   label: '비디오', icon: 'video' },
+    { id: 'music',   label: '음악',   icon: 'music' },
+  ]},
+  { group: '도구', items: [
+    { id: 'search', label: '검색',   icon: 'search' },
+    { id: 'sync',   label: '동기화', icon: 'sync' },
+    { id: 'share',  label: '공유',   icon: 'share' },
+  ]},
+  { group: '시스템', items: [
+    { id: 'admin',  label: '대시보드', icon: 'admin' },
+    { id: 'users',  label: '사용자',   icon: 'users' },
+  ]},
+];
+
+const CRUMBS: Record<string, string[]> = {
+  files:   ['파일', '내 보관함'],
+  gallery: ['갤러리'],
+  video:   ['비디오'],
+  music:   ['음악'],
+  search:  ['검색'],
+  sync:    ['동기화'],
+  share:   ['공유'],
+  users:   ['사용자'],
+  settings:['설정'],
+  admin:   ['대시보드'],
+};
+
+function Avatar({ username, size = 32 }: { username: string; size?: number }) {
+  const hue = username.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  const initials = username.slice(0, 2).toUpperCase();
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{
+      width: size, height: size, borderRadius: '9px',
+      display: 'grid', placeItems: 'center',
+      color: '#fff', fontWeight: 600, fontSize: size * 0.38, flexShrink: 0,
+      background: `hsl(${hue} 46% 48%)`,
+    }}>
+      {initials}
+    </div>
+  );
 }
 
-export default App
+function Sidebar({ active, onNav, user }: { active: string; onNav: (id: string) => void; user: UserResponseDto | null }) {
+  const storageUsed = 412;
+  const storageTotal = 1024;
+  const pct = Math.round((storageUsed / storageTotal) * 100);
+
+  return (
+    <aside className="sidebar">
+      <div className="sb-brand">
+        <div className="logo">F</div>
+        <div>
+          <div className="name">FSHS</div>
+          <div className="host">fshs2.seohamin.com</div>
+        </div>
+      </div>
+      <button className="sb-new" onClick={() => onNav('files')}>
+        <Icon name="upload" size={18} color="currentColor" stroke={2} />
+        업로드
+      </button>
+      <nav className="sb-nav">
+        {NAV.map((g) => (
+          <div className="sb-group" key={g.group}>
+            <div className="gt">{g.group}</div>
+            {g.items.map((item) => (
+              <div key={item.id}
+                className={'sb-item' + (active === item.id ? ' active' : '')}
+                onClick={() => onNav(item.id)}>
+                <Icon name={item.icon} size={19} stroke={1.7} />
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </nav>
+      <div className="sb-foot">
+        <div className="sb-storage">
+          <div className="meter"><i style={{ width: pct + '%' }} /></div>
+          <div className="txt">{storageUsed} / {storageTotal} GB · {pct}%</div>
+        </div>
+        <div className="sb-user">
+          {user && <Avatar username={user.username} size={34} />}
+          <div className="meta">
+            <div className="n">{user?.username || '—'}</div>
+            <div className="e">{user?.role || ''}</div>
+          </div>
+          <button className="gear" onClick={() => onNav('settings')}>
+            <Icon name="settings" size={15} />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout }: {
+  crumbs: string[];
+  onSearch: () => void;
+  dark: boolean;
+  onToggleDark: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="topbar">
+      <div className="crumbs">
+        {crumbs.map((c, i) => (
+          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            {i > 0 && <span className="sep">›</span>}
+            <span className={'c' + (i === crumbs.length - 1 ? ' cur' : '')}>{c}</span>
+          </span>
+        ))}
+      </div>
+      <div className="tb-search" onClick={onSearch}>
+        <Icon name="search" size={16} />
+        <span className="t">검색</span>
+        <kbd>⌘K</kbd>
+      </div>
+      <button className="tb-icon" title={dark ? '라이트 모드' : '다크 모드'} onClick={onToggleDark}>
+        <Icon name={dark ? 'sun' : 'moon'} size={18} />
+      </button>
+      <button className="tb-icon" title="로그아웃" onClick={onLogout}>
+        <Icon name="power" size={18} />
+      </button>
+    </div>
+  );
+}
+
+export default function App() {
+  const [authed, setAuthed] = useState(false);
+  const [screen, setScreen] = useState<Screen>('files');
+  const [dark, setDark] = useState(false);
+  const [user, setUser] = useState<UserResponseDto | null>(null);
+  const [_username, setUsername] = useState('');
+  const [videoFileId, setVideoFileId] = useState<number | null>(null);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setScreen('search');
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
+  async function handleSignIn(uname: string) {
+    setUsername(uname);
+    setAuthed(true);
+    // Try to find the current user by trying sequential IDs
+    for (let i = 1; i <= 20; i++) {
+      try {
+        const u = await getUser(i);
+        if (u.username === uname) {
+          setUser(u);
+          break;
+        }
+      } catch { break; }
+    }
+  }
+
+  async function handleLogout() {
+    await logout();
+    setAuthed(false);
+    setUser(null);
+    setUsername('');
+  }
+
+  function handleNav(id: string) {
+    if (id === 'logout') { handleLogout(); return; }
+    setScreen(id as Screen);
+  }
+
+  function openVideo(fileId: number) {
+    setVideoFileId(fileId);
+    setScreen('video');
+  }
+
+  if (!authed) {
+    return <LoginScreen onSignIn={handleSignIn} />;
+  }
+
+  if (screen === 'video') {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
+        <VideoScreen fileId={videoFileId} onBack={() => setScreen('files')} />
+      </div>
+    );
+  }
+
+  const rootFolderId = user?.rootFolderId ?? null;
+
+  return (
+    <div className="app">
+      <Sidebar active={screen} onNav={handleNav} user={user} />
+      <main className="main">
+        <TopBar
+          crumbs={CRUMBS[screen] || ['홈']}
+          onSearch={() => setScreen('search')}
+          dark={dark}
+          onToggleDark={() => setDark(v => !v)}
+          onLogout={handleLogout}
+        />
+        {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
+        {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
+        {screen === 'music'   && <MusicScreen rootFolderId={rootFolderId} />}
+        {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
+        {screen === 'sync'    && <SyncScreen />}
+        {screen === 'share'   && <ShareScreen />}
+        {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} />}
+        {screen === 'settings'&& <UsersScreen currentUserId={user?.id ?? null} />}
+        {screen === 'admin'   && <AdminScreen />}
+      </main>
+    </div>
+  );
+}
