@@ -8,6 +8,10 @@ export default defineConfig({
       '/api': {
         target: 'https://fshs2.seohamin.com',
         changeOrigin: true,
+        headers: {
+          Origin: 'https://fshs2.seohamin.com',
+        },
+        cookieDomainRewrite: '',
       },
     },
   },
