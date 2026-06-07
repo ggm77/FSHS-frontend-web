@@ -27,7 +27,58 @@ export function VideoScreen({ fileId, onBack }: Props) {
   const [streamStart, setStreamStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [userActive, setUserActive] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const activeTimeoutRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!playing) {
+      setUserActive(true);
+      if (activeTimeoutRef.current) {
+        window.clearTimeout(activeTimeoutRef.current);
+        activeTimeoutRef.current = null;
+      }
+    } else {
+      handleMouseMove();
+    }
+  }, [playing]);
+
+  function handleMouseMove() {
+    setUserActive(true);
+    if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
+    
+    if (playing) {
+      activeTimeoutRef.current = window.setTimeout(() => {
+        setUserActive(false);
+      }, 3000);
+    }
+  }
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch((err) => {
+        console.error('Failed to enter fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
 
   useEffect(() => {
     setError(null);
@@ -99,8 +150,14 @@ export function VideoScreen({ fileId, onBack }: Props) {
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
 
+  const hideControls = isFullscreen && !userActive && playing;
+
   return (
-    <div className="video-page">
+    <div
+      ref={containerRef}
+      className={`video-page${isFullscreen ? ' is-fullscreen' : ''}${hideControls ? ' hide-controls' : ''}`}
+      onMouseMove={handleMouseMove}
+    >
       <style>{videoStyles}</style>
 
       <div className="video-stage">
@@ -239,7 +296,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
           }}>
             <Icon name="volume" size={16} stroke={1.5} color="#fff" />
           </button>
-          <button className="pbtn" title="전체화면" onClick={() => videoRef.current?.requestFullscreen()}>
+          <button className="pbtn" title={isFullscreen ? '전체화면 종료' : '전체화면'} onClick={toggleFullscreen}>
             <Icon name="fullscreen" size={16} stroke={1.5} color="#fff" />
           </button>
           <span className="time" style={{ textAlign: 'right' }}>{formatTime(duration)}</span>
@@ -394,4 +451,46 @@ const videoStyles = `
   .spin-icon {
     animation: spin 1s linear infinite;
   }
+  .video-page.is-fullscreen {
+    display: block;
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+  }
+  .video-page.is-fullscreen .video-stage {
+    height: 100vh;
+    width: 100vw;
+  }
+  .video-page.is-fullscreen video {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .video-page.is-fullscreen .player-chrome {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 30%, #000);
+    border-top: 0;
+    padding: 40px 24px 24px;
+  }
+  .video-page.hide-controls {
+    cursor: none;
+  }
+  .video-page.hide-controls .player-chrome,
+  .video-page.hide-controls .video-back,
+  .video-page.hide-controls .video-title,
+  .video-page.hide-controls .transcoding-hud {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .player-chrome, .video-back, .video-title, .transcoding-hud {
+    transition: opacity 0.3s ease;
+  }
+
 `;
