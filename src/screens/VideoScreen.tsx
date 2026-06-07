@@ -24,6 +24,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
   const [buffered, setBuffered] = useState(0);
   const [_volume, setVolume] = useState(1);
   const [useStream, setUseStream] = useState(false);
+  const [streamStart, setStreamStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -32,6 +33,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
     setFile(null);
     setUseStream(false);
     setDuration(0);
+    setStreamStart(0);
   }, [fileId]);
 
   useEffect(() => {
@@ -49,16 +51,24 @@ export function VideoScreen({ fileId, onBack }: Props) {
   }, [fileId]);
 
   const videoSrc = (fileId != null && file != null)
-    ? (useStream ? getFileStreamUrl(fileId) : getFileContentUrl(fileId, false))
+    ? (useStream ? getFileStreamUrl(fileId, streamStart) : getFileContentUrl(fileId, false))
     : '';
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !videoSrc) return;
+    if (playing) {
+      v.play().catch(() => setPlaying(false));
+    }
+  }, [videoSrc]);
 
   const needsTranscoding = file?.videoCodec && !['h264', 'avc', 'avc1'].includes((file.videoCodec || '').toLowerCase());
 
   function handleTimeUpdate() {
     const v = videoRef.current;
     if (!v) return;
-    setCurrentTime(v.currentTime);
-    if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
+    setCurrentTime(streamStart + v.currentTime);
+    if (v.buffered.length > 0) setBuffered(streamStart + v.buffered.end(v.buffered.length - 1));
   }
 
   function handleSeek(e: React.MouseEvent<HTMLDivElement>) {
@@ -66,7 +76,15 @@ export function VideoScreen({ fileId, onBack }: Props) {
     if (!v || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
-    v.currentTime = pct * duration;
+    const targetTime = pct * duration;
+
+    if (useStream) {
+      setStreamStart(targetTime);
+      setCurrentTime(targetTime);
+      setBuffered(targetTime);
+    } else {
+      v.currentTime = targetTime;
+    }
   }
 
   function togglePlay() {
