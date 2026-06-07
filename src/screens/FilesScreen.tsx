@@ -98,6 +98,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   async function loadFolder(folderId: number, reset = false) {
     setLoading(true);
     setError('');
+    setSelected(null);
     try {
       const data = await getFolder(folderId);
       setFolder(data);
@@ -364,116 +365,138 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           </div>
         ) : folder ? (
           <>
-            {/* Folders */}
-            {folder.folders.length > 0 && (
-              <>
-                <div className="section-h">
-                  <div className="t">폴더</div>
-                  <span className="a">{folder.folders.length}개</span>
-                </div>
-                <div className="folder-grid">
+            {(folder.folders.length > 0 || folder.files.length > 0) ? (
+              view === 'list' ? (
+                <div className="card file-card">
+                  <div className="file-row head">
+                    <div>이름</div>
+                    <div>수정일</div>
+                    <div>종류</div>
+                    <div style={{ textAlign: 'right' }}>크기</div>
+                    <div />
+                  </div>
+                  {/* Folders first */}
                   {folder.folders.map((f) => (
-                    <div className="folder-card" key={f.id} onClick={() => navigateTo(f)}>
-                      <div className="fi"><Icon name="folder" size={21} color="var(--c-folder)" stroke={1.7} /></div>
-                      <div className="txt">
-                        <div className="nm">{f.name}</div>
-                        <div className="meta">{formatDate(f.originUpdatedAt)}</div>
+                    <div key={`folder-${f.id}`}
+                      className="file-row"
+                      onClick={() => navigateTo(f)}>
+                      <div className="file-name">
+                        <div className="file-thumb-sm">
+                          <Icon name="folder" size={20} color="var(--c-folder)" stroke={1.7} />
+                        </div>
+                        <span className="nm">{f.name}</span>
                       </div>
-                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button className="more" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
+                      <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
+                      <div className="file-meta">FOLDER</div>
+                      <div className="file-meta" style={{ textAlign: 'right' }}>—</div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="row-action" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
                           <Icon name="download" size={14} />
                         </button>
-                        <button className="more" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
+                        <button className="row-action" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
                         </button>
-                        <button className="more" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
+                        <button className="row-action" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Files next */}
+                  {folder.files.map((f) => (
+                    <div key={`file-${f.id}`}
+                      className={'file-row' + (selected === f.id ? ' selected' : '')}
+                      onClick={() => {
+                        setSelected(f.id);
+                        if (f.category === 'VIDEO') onOpenVideo(f.id);
+                        else onOpenFile(f.id);
+                      }}>
+                      <div className="file-name">
+                        <div className="file-thumb-sm">
+                          <FileIcon file={f} size={20} />
+                        </div>
+                        <span className="nm">{f.name}</span>
+                        {f.category === 'VIDEO' && f.videoCodec && (
+                          <span className="badge-codec">{f.videoCodec}</span>
+                        )}
+                      </div>
+                      <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
+                      <div className="file-meta">{f.category}</div>
+                      <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="row-action" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
+                          <Icon name="download" size={14} />
+                        </button>
+                        <button className="row-action" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
+                          <Icon name="move" size={14} />
+                        </button>
+                        <button className="row-action" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
                           <Icon name="trash" size={14} />
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </>
-            )}
-
-            {/* Files */}
-            {folder.files.length > 0 && (
-              <>
-                <div className="section-h">
-                  <div className="t">파일</div>
-                  <span className="a">{folder.files.length}개</span>
-                </div>
-                {view === 'list' ? (
-                  <div className="card file-card">
-                    <div className="file-row head">
-                      <div>이름</div>
-                      <div>수정일</div>
-                      <div>종류</div>
-                      <div style={{ textAlign: 'right' }}>크기</div>
-                      <div />
+              ) : (
+                <div className="file-grid">
+                  {/* Folders first */}
+                  {folder.folders.map((f) => (
+                    <div className="grid-card" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
+                      <div className="gc-head">
+                        <Icon name="folder" size={18} color="var(--c-folder)" stroke={1.7} />
+                        <span className="nm">{f.name}</span>
+                      </div>
+                      <div className="gc-prev">
+                        <Icon name="folder" size={40} color="var(--c-folder)" stroke={1.7} />
+                      </div>
+                      <div className="grid-card-actions">
+                        <button className="grid-action-btn" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
+                          <Icon name="download" size={14} />
+                        </button>
+                        <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
+                          <Icon name="move" size={14} />
+                        </button>
+                        <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </div>
                     </div>
-                    {folder.files.map((f, i) => (
-                      <div key={f.id}
-                        className={'file-row' + (selected === i ? ' selected' : '')}
-                        onClick={() => {
-                          setSelected(i);
-                          if (f.category === 'VIDEO') onOpenVideo(f.id);
-                          else onOpenFile(f.id);
-                        }}>
-                        <div className="file-name">
-                          <div className="file-thumb-sm">
-                            <FileIcon file={f} size={20} />
-                          </div>
-                          <span className="nm">{f.name}</span>
-                          {f.category === 'VIDEO' && f.videoCodec && (
-                            <span className="badge-codec">{f.videoCodec}</span>
-                          )}
-                        </div>
-                        <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
-                        <div className="file-meta">{f.category}</div>
-                        <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
-                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="row-action" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
-                            <Icon name="download" size={14} />
-                          </button>
-                          <button className="row-action" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
-                            <Icon name="move" size={14} />
-                          </button>
-                          <button className="row-action" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
-                            <Icon name="trash" size={14} />
-                          </button>
-                        </div>
+                  ))}
+                  {/* Files next */}
+                  {folder.files.map((f) => (
+                    <div className="grid-card" key={`file-${f.id}`}
+                      onClick={() => {
+                        if (f.category === 'VIDEO') onOpenVideo(f.id);
+                        else onOpenFile(f.id);
+                      }}>
+                      <div className="gc-head">
+                        <FileIcon file={f} size={18} />
+                        <span className="nm">{f.name}</span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="file-grid">
-                    {folder.files.map((f) => (
-                      <div className="grid-card" key={f.id}
-                        onClick={() => {
-                          if (f.category === 'VIDEO') onOpenVideo(f.id);
-                          else onOpenFile(f.id);
-                        }}>
-                        <div className="gc-head">
-                          <FileIcon file={f} size={18} />
-                          <span className="nm">{f.name}</span>
-                        </div>
-                        <div className="gc-prev" style={
-                          f.category === 'VIDEO' ? { background: 'linear-gradient(135deg, #2a2730, #19171d)' } : {}
-                        }>
-                          {f.category === 'VIDEO'
-                            ? <Icon name="play" size={34} color="#fff" stroke={1.5} />
-                            : <FileIcon file={f} size={40} />
-                          }
-                        </div>
+                      <div className="gc-prev" style={
+                        f.category === 'VIDEO' ? { background: 'linear-gradient(135deg, #2a2730, #19171d)' } : {}
+                      }>
+                        {f.category === 'VIDEO'
+                          ? <Icon name="play" size={34} color="#fff" stroke={1.5} />
+                          : <FileIcon file={f} size={40} />
+                        }
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {folder.folders.length === 0 && folder.files.length === 0 && (
+                      <div className="grid-card-actions">
+                        <button className="grid-action-btn" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
+                          <Icon name="download" size={14} />
+                        </button>
+                        <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
+                          <Icon name="move" size={14} />
+                        </button>
+                        <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 24px', color: 'var(--fg-3)', textAlign: 'center' }}>
                 <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--surface-1)', display: 'grid', placeItems: 'center', marginBottom: 16 }}>
                   <Icon name="folder" size={32} stroke={1.4} />
@@ -920,5 +943,45 @@ const filesStyles = `
     padding: 0 16px;
     font-size: 13px;
     font-weight: 600;
+  }
+
+  .grid-card {
+    position: relative;
+  }
+  .grid-card-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+  }
+  .grid-card:hover .grid-card-actions {
+    opacity: 1;
+  }
+  .grid-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: var(--fg-3);
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .grid-action-btn:hover {
+    background: var(--surface-2);
+    color: var(--fg);
+    transform: scale(1.05);
+  }
+  @media (max-width: 768px) {
+    .grid-card-actions {
+      opacity: 1;
+    }
   }
 `;
