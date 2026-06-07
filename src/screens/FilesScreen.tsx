@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../components/Icon';
-import { getFolder, createFolder, deleteFolder, getFolderDownloadUrl } from '../api/folders';
-import { uploadFile, deleteFile, getFileContentUrl, formatBytes, getFileStatus } from '../api/files';
+import { getFolder, createFolder, deleteFolder, getFolderDownloadUrl, renameFolder } from '../api/folders';
+import { uploadFile, deleteFile, getFileContentUrl, formatBytes, getFileStatus, moveFile } from '../api/files';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
 
 interface Props {
@@ -55,6 +55,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [movingItem, setMovingItem] = useState<{ type: 'file' | 'folder'; id: number; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
@@ -224,6 +225,32 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
+  function handleStartMove(type: 'file' | 'folder', id: number, name: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setMovingItem({ type, id, name });
+  }
+
+  async function handleConfirmMove() {
+    if (!movingItem || currentFolderId == null) return;
+    
+    if (movingItem.type === 'folder' && movingItem.id === currentFolderId) {
+      alert('현재 폴더로 이동할 수 없습니다.');
+      return;
+    }
+
+    try {
+      if (movingItem.type === 'file') {
+        await moveFile(movingItem.id, currentFolderId);
+      } else {
+        await renameFolder(movingItem.id, undefined, currentFolderId);
+      }
+      loadFolder(currentFolderId);
+      setMovingItem(null);
+    } catch (err: any) {
+      alert(err.message || '이동에 실패했습니다.');
+    }
+  }
+
   const crumbItems = [
     { label: '내 보관함', onClick: () => { loadFolder(rootFolderId!, true); } },
     ...path.map((p, i) => ({ label: p.name, onClick: () => navigateBreadcrumb(i) })),
@@ -300,9 +327,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         <div className="nm">{f.name}</div>
                         <div className="meta">{formatDate(f.originUpdatedAt)}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                         <button className="more" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
                           <Icon name="download" size={14} />
+                        </button>
+                        <button className="more" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
+                          <Icon name="move" size={14} />
                         </button>
                         <button className="more" title="열기" onClick={() => navigateTo(f)}>
                           <Icon name="folderOpen" size={14} />
@@ -353,9 +383,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
                         <div className="file-meta">{f.category}</div>
                         <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                         <div style={{ display: 'flex', gap: 4 }}>
                           <button className="row-action" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
                             <Icon name="download" size={14} />
+                          </button>
+                          <button className="row-action" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
+                            <Icon name="move" size={14} />
                           </button>
                           <button className="row-action" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
                             <Icon name="trash" size={14} />
@@ -453,6 +486,25 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {movingItem && (
+        <div className="move-banner">
+          <div className="banner-content">
+            <Icon name="move" size={16} color="var(--accent)" />
+            <span className="msg">
+              <strong>{movingItem.name}</strong>을(를) 이동하는 중... (목적지 폴더로 이동 후 붙여넣기를 누르세요)
+            </span>
+          </div>
+          <div className="banner-actions">
+            <button className="btn primary" onClick={handleConfirmMove}>
+              <Icon name="check" size={14} color="var(--accent-fg)" />여기에 붙여넣기
+            </button>
+            <button className="btn" onClick={() => setMovingItem(null)}>
+              취소
+            </button>
           </div>
         </div>
       )}
@@ -634,5 +686,103 @@ const filesStyles = `
   .upload-status-widget .spin-icon {
     animation: spin 1s linear infinite;
     display: inline-block;
+  }
+
+  .move-banner {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 32, 40, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    max-width: 90%;
+    width: 680px;
+    animation: slideUpMove 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  
+  @keyframes slideUpMove {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+  }
+
+  .move-banner .banner-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-size: 13px;
+    min-width: 0;
+  }
+
+  .move-banner .banner-content .msg {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .move-banner .banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .move-banner .banner-actions button {
+    height: 34px;
+    font-size: 12.5px;
+    padding: 0 12px;
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .move-banner {
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      width: calc(100% - 32px);
+      left: 16px;
+      transform: none;
+      bottom: 16px;
+    }
+    
+    @keyframes slideUpMove {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .move-banner .banner-content {
+      width: 100%;
+    }
+    
+    .move-banner .banner-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+    
+    .move-banner .banner-actions button {
+      flex: 1;
+    }
   }
 `;
