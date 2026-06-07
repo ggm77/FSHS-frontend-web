@@ -31,6 +31,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
     setError(null);
     setFile(null);
     setUseStream(false);
+    setDuration(0);
   }, [fileId]);
 
   useEffect(() => {
@@ -40,6 +41,10 @@ export function VideoScreen({ fileId, onBack }: Props) {
       // Use stream endpoint if codec needs transcoding (not H.264/AVC baseline)
       const needsTranscode = f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase());
       setUseStream(!!needsTranscode);
+      if (f.duration) {
+        const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
+        setDuration(secs);
+      }
     });
   }, [fileId]);
 
@@ -87,7 +92,11 @@ export function VideoScreen({ fileId, onBack }: Props) {
             playsInline
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            onLoadedMetadata={() => {
+              if (!duration && videoRef.current) {
+                setDuration(videoRef.current.duration || 0);
+              }
+            }}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
@@ -137,6 +146,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
             <div className="t">{file.baseName}</div>
             <div className="s">
               {file.width && file.height ? `${file.width}×${file.height} · ` : ''}
+              {file.duration ? `${formatTime(file.duration > 50000 ? file.duration / 1000 : file.duration)} · ` : ''}
               {file.videoCodec || ''}
               {file.size ? ` · ${formatBytes(file.size)}` : ''}
             </div>

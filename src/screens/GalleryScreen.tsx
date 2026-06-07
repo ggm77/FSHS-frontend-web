@@ -26,8 +26,8 @@ function groupByDate(files: FileResponseDto[]): DayGroup[] {
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
 }
 
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
+function formatDuration(val: number): string {
+  const s = Math.floor(val > 50000 ? val / 1000 : val);
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
