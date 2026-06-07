@@ -386,9 +386,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         <button className="more" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
                         </button>
-                        <button className="more" title="열기" onClick={() => navigateTo(f)}>
-                          <Icon name="folderOpen" size={14} />
-                        </button>
                         <button className="more" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
                           <Icon name="trash" size={14} />
                         </button>
