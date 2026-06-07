@@ -16,6 +16,7 @@ export async function uploadFile(
 ): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('originUpdatedAt', new Date(file.lastModified).toISOString());
   formData.append('lastModified', new Date(file.lastModified).toISOString());
   formData.append('folderId', String(folderId));
 

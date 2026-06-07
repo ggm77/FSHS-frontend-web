@@ -204,7 +204,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       <div className="fi"><Icon name="folder" size={21} color="var(--c-folder)" stroke={1.7} /></div>
                       <div className="txt">
                         <div className="nm">{f.name}</div>
-                        <div className="meta">{formatDate(f.updatedAt)}</div>
+                        <div className="meta">{formatDate(f.originUpdatedAt)}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                         <button className="more" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
@@ -256,7 +256,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                             <span className="badge-codec">{f.videoCodec}</span>
                           )}
                         </div>
-                        <div className="file-meta">{formatDate(f.updatedAt)}</div>
+                        <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
                         <div className="file-meta">{f.category}</div>
                         <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
                         <div style={{ display: 'flex', gap: 4 }}>
