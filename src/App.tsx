@@ -168,6 +168,28 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        const u: UserResponseDto = JSON.parse(stored);
+        getUser(u.id)
+          .then(verified => {
+            setUser(verified);
+            setAuthed(true);
+            localStorage.setItem('user', JSON.stringify(verified));
+          })
+          .catch(() => {
+            localStorage.removeItem('user');
+            setAuthed(false);
+            setUser(null);
+          });
+      } catch {
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
   async function handleSignIn(uname: string) {
     setUsername(uname);
     setAuthed(true);
@@ -177,6 +199,7 @@ export default function App() {
         const u = await getUser(i);
         if (u.username === uname) {
           setUser(u);
+          localStorage.setItem('user', JSON.stringify(u));
           break;
         }
       } catch { break; }
@@ -188,6 +211,7 @@ export default function App() {
     setAuthed(false);
     setUser(null);
     setUsername('');
+    localStorage.removeItem('user');
   }
 
   function handleNav(id: string) {
