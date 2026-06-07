@@ -24,7 +24,14 @@ export function VideoScreen({ fileId, onBack }: Props) {
   const [buffered, setBuffered] = useState(0);
   const [_volume, setVolume] = useState(1);
   const [useStream, setUseStream] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    setError(null);
+    setFile(null);
+    setUseStream(false);
+  }, [fileId]);
 
   useEffect(() => {
     if (!fileId) return;
@@ -36,7 +43,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
     });
   }, [fileId]);
 
-  const videoSrc = fileId != null
+  const videoSrc = (fileId != null && file != null)
     ? (useStream ? getFileStreamUrl(fileId) : getFileContentUrl(fileId, false))
     : '';
 
@@ -72,16 +79,54 @@ export function VideoScreen({ fileId, onBack }: Props) {
       <style>{videoStyles}</style>
 
       <div className="video-stage">
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
-        />
+        {videoSrc ? (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            crossOrigin="use-credentials"
+            playsInline
+            style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
+            onError={() => {
+              const mediaError = videoRef.current?.error;
+              console.error('Video error:', mediaError);
+              if (mediaError) {
+                setError(`재생 오류: ${mediaError.message || `코드 ${mediaError.code}`} (상태: ${mediaError.code})`);
+              } else {
+                setError('비디오를 로드하는 중 오류가 발생했습니다.');
+              }
+            }}
+          />
+        ) : (
+          <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <Icon name="spinner" size={28} />
+            <span>비디오 정보 불러오는 중...</span>
+          </div>
+        )}
+
+        {error && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ff4d4f',
+            zIndex: 10,
+            padding: 20,
+            textAlign: 'center'
+          }}>
+            <Icon name="warn" size={40} color="#ff4d4f" />
+            <h3 style={{ margin: '16px 0 8px 0', fontSize: 16, color: '#fff' }}>동영상 재생 실패</h3>
+            <p style={{ margin: 0, fontSize: 13, opacity: 0.85 }}>{error}</p>
+          </div>
+        )}
 
         <button className="video-back" onClick={onBack}>
           <Icon name="chevronL" size={14} /> 라이브러리로

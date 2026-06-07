@@ -64,6 +64,7 @@ export function getFileContentUrl(fileId: number, download: boolean): string {
 }
 
 export function getFileStreamUrl(fileId: number, start = 0): string {
+  if (start === 0) return `/api/v2/files/${fileId}/stream`;
   return `/api/v2/files/${fileId}/stream?start=${start}`;
 }
 
