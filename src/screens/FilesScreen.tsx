@@ -53,9 +53,17 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     status: 'UPLOADING' | 'PROCESSING' | 'COMPLETE' | 'ERROR';
   }
 
+  interface DialogConfig {
+    type: 'alert' | 'confirm';
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  }
+
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [movingItem, setMovingItem] = useState<{ type: 'file' | 'folder'; id: number; name: string } | null>(null);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
@@ -135,18 +143,52 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
-  async function handleDeleteFolder(folderId: number, e: React.MouseEvent) {
+  function handleDeleteFolder(folderId: number, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm('폴더를 삭제하시겠습니까?')) return;
-    await deleteFolder(folderId);
-    loadFolder(currentFolderId!);
+    setDialog({
+      type: 'confirm',
+      title: '폴더 삭제',
+      message: '폴더를 삭제하시겠습니까? 폴더 안의 모든 파일과 하위 폴더도 함께 삭제됩니다.',
+      onConfirm: async () => {
+        try {
+          await deleteFolder(folderId);
+          loadFolder(currentFolderId!);
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            title: '삭제 실패',
+            message: err.message || '폴더를 삭제하지 못했습니다.',
+            onConfirm: () => setDialog(null)
+          });
+          return;
+        }
+        setDialog(null);
+      }
+    });
   }
 
-  async function handleDeleteFile(fileId: number, e: React.MouseEvent) {
+  function handleDeleteFile(fileId: number, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm('파일을 삭제하시겠습니까?')) return;
-    await deleteFile(fileId);
-    loadFolder(currentFolderId!);
+    setDialog({
+      type: 'confirm',
+      title: '파일 삭제',
+      message: '파일을 삭제하시겠습니까? 삭제된 파일은 복구할 수 없습니다.',
+      onConfirm: async () => {
+        try {
+          await deleteFile(fileId);
+          loadFolder(currentFolderId!);
+        } catch (err: any) {
+          setDialog({
+            type: 'alert',
+            title: '삭제 실패',
+            message: err.message || '파일을 삭제하지 못했습니다.',
+            onConfirm: () => setDialog(null)
+          });
+          return;
+        }
+        setDialog(null);
+      }
+    });
   }
 
   async function handleUpload(files: FileList | null) {
@@ -234,7 +276,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     if (!movingItem || currentFolderId == null) return;
     
     if (movingItem.type === 'folder' && movingItem.id === currentFolderId) {
-      alert('현재 폴더로 이동할 수 없습니다.');
+      setDialog({
+        type: 'alert',
+        title: '이동 불가',
+        message: '현재 폴더로 이동할 수 없습니다.',
+        onConfirm: () => setDialog(null)
+      });
       return;
     }
 
@@ -247,7 +294,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
       loadFolder(currentFolderId);
       setMovingItem(null);
     } catch (err: any) {
-      alert(err.message || '이동에 실패했습니다.');
+      setDialog({
+        type: 'alert',
+        title: '이동 실패',
+        message: err.message || '이동에 실패했습니다.',
+        onConfirm: () => setDialog(null)
+      });
     }
   }
 
@@ -505,6 +557,30 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             <button className="btn" onClick={() => setMovingItem(null)}>
               취소
             </button>
+          </div>
+        </div>
+      )}
+
+      {dialog && (
+        <div className="modal-backdrop" onClick={() => setDialog(null)}>
+          <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{dialog.title}</h3>
+              <button className="close-btn" onClick={() => setDialog(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>{dialog.message}</p>
+            </div>
+            <div className="modal-footer">
+              {dialog.type === 'confirm' && (
+                <button className="btn" onClick={() => setDialog(null)}>취소</button>
+              )}
+              <button className="btn primary" onClick={dialog.onConfirm}>
+                확인
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -784,5 +860,68 @@ const filesStyles = `
     .move-banner .banner-actions button {
       flex: 1;
     }
+  }
+
+  .confirm-modal {
+    width: 360px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  }
+  
+  .confirm-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+  }
+  
+  .confirm-modal .modal-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  
+  .confirm-modal .modal-header .close-btn {
+    background: transparent;
+    border: 0;
+    color: var(--fg-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 4px;
+    border-radius: 6px;
+  }
+  
+  .confirm-modal .modal-header .close-btn:hover {
+    background: var(--surface-1);
+    color: var(--fg);
+  }
+  
+  .confirm-modal .modal-body {
+    padding: 20px;
+    font-size: 13.5px;
+    color: var(--fg-2);
+    line-height: 1.5;
+  }
+  
+  .confirm-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: var(--bg-3);
+    border-top: 1px solid var(--hairline);
+  }
+  
+  .confirm-modal .modal-footer button {
+    height: 36px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
   }
 `;
