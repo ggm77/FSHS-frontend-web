@@ -60,10 +60,6 @@ function Avatar({ username, size = 32 }: { username: string; size?: number }) {
 }
 
 function Sidebar({ active, onNav, user, className }: { active: string; onNav: (id: string) => void; user: UserResponseDto | null; className?: string }) {
-  const storageUsed = 412;
-  const storageTotal = 1024;
-  const pct = Math.round((storageUsed / storageTotal) * 100);
-
   return (
     <aside className={`sidebar ${className || ''}`}>
       <div className="sb-brand">
@@ -93,10 +89,6 @@ function Sidebar({ active, onNav, user, className }: { active: string; onNav: (i
         ))}
       </nav>
       <div className="sb-foot">
-        <div className="sb-storage">
-          <div className="meter"><i style={{ width: pct + '%' }} /></div>
-          <div className="txt">{storageUsed} / {storageTotal} GB · {pct}%</div>
-        </div>
         <div className="sb-user">
           {user && <Avatar username={user.username} size={34} />}
           <div className="meta">
