@@ -54,6 +54,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   }
 
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
@@ -102,6 +103,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     try {
       await createFolder(currentFolderId, newFolderName.trim());
       setNewFolderName('');
+      setShowNewFolder(false);
       loadFolder(currentFolderId);
     } finally {
       setCreatingFolder(false);
@@ -229,10 +231,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             {uploading ? '업로드 중...' : '업로드'}
           </button>
           <div style={{ position: 'relative' }}>
-            <button className="btn" onClick={() => setNewFolderName(v => v ? '' : '새 폴더')}>
+            <button className="btn" onClick={() => { setShowNewFolder(v => !v); setNewFolderName('새 폴더'); }}>
               <Icon name="plus" size={15} /> 새 폴더
             </button>
-            {newFolderName !== '' && (
+            {showNewFolder && (
               <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 20, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, boxShadow: 'var(--shadow-md)', display: 'flex', gap: 8 }}>
                 <input
                   value={newFolderName}
@@ -242,7 +244,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '4px 10px', font: 'inherit', background: 'var(--bg)', color: 'var(--fg)', outline: 'none' }}
                 />
                 <button className="btn primary" style={{ height: 32 }} onClick={handleCreateFolder} disabled={creatingFolder}>만들기</button>
-                <button className="btn" style={{ height: 32 }} onClick={() => setNewFolderName('')}>취소</button>
+                <button className="btn" style={{ height: 32 }} onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>취소</button>
               </div>
             )}
           </div>
