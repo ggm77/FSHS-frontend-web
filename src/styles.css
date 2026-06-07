@@ -408,7 +408,7 @@ button{font-family:inherit; color:inherit; cursor:pointer}
   }
   
   .file-row {
-    grid-template-columns: minmax(0, 3fr) 1fr 60px !important;
+    grid-template-columns: minmax(0, 3fr) 1fr 96px !important;
     padding: 0 12px !important;
   }
   

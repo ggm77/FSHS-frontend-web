@@ -6,7 +6,7 @@ import type { FileResponseDto } from '../types';
 
 interface Props {
   rootFolderId: number | null;
-  onOpenVideo: (fileId: number) => void;
+  onOpenVideo: (fileId: number, fileData?: FileResponseDto) => void;
   onOpenFile: (fileId: number) => void;
 }
 
@@ -116,7 +116,7 @@ export function GalleryScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) 
                 <div key={f.id}
                   className="gphoto"
                   style={{ background: 'var(--surface-2)', position: 'relative', overflow: 'hidden' }}
-                  onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id) : onOpenFile(f.id)}>
+                  onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id, f) : onOpenFile(f.id)}>
                   {f.category === 'IMAGE' ? (
                     <img
                       src={getFileContentUrl(f.id, false)}

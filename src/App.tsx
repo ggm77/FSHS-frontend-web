@@ -13,7 +13,7 @@ import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { logout } from './api/auth';
 import { getUser } from './api/users';
-import type { UserResponseDto } from './types';
+import type { UserResponseDto, FileResponseDto } from './types';
 
 type Screen = 'files' | 'gallery' | 'video' | 'viewer' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
 
@@ -147,6 +147,7 @@ export default function App() {
   const [user, setUser] = useState<UserResponseDto | null>(null);
   const [_username, setUsername] = useState('');
   const [videoFileId, setVideoFileId] = useState<number | null>(null);
+  const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
   const [viewerFileId, setViewerFileId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -171,10 +172,12 @@ export default function App() {
       } else if (state && state.screen) {
         setScreen(state.screen);
         setVideoFileId(null);
+        setVideoFile(null);
         setViewerFileId(null);
       } else {
         setScreen('files');
         setVideoFileId(null);
+        setVideoFile(null);
         setViewerFileId(null);
       }
     };
@@ -247,8 +250,9 @@ export default function App() {
     setSidebarOpen(false);
   }
 
-  function openVideo(fileId: number) {
+  function openVideo(fileId: number, fileData?: FileResponseDto) {
     setVideoFileId(fileId);
+    setVideoFile(fileData || null);
     setScreen('video');
     window.history.pushState({ type: 'video', fileId, fromScreen: screen }, '');
   }
@@ -265,6 +269,7 @@ export default function App() {
     } else {
       setScreen('files');
       setVideoFileId(null);
+      setVideoFile(null);
       setViewerFileId(null);
     }
   }
@@ -276,7 +281,7 @@ export default function App() {
   if (screen === 'video') {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
-        <VideoScreen fileId={videoFileId} onBack={handleBack} />
+        <VideoScreen fileId={videoFileId} initialFile={videoFile} onBack={handleBack} />
       </div>
     );
   }

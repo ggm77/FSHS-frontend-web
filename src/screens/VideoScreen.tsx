@@ -5,6 +5,7 @@ import type { FileResponseDto } from '../types';
 
 interface Props {
   fileId: number | null;
+  initialFile?: FileResponseDto | null;
   onBack: () => void;
 }
 
@@ -16,9 +17,9 @@ function formatTime(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function VideoScreen({ fileId, onBack }: Props) {
-  const [file, setFile] = useState<FileResponseDto | null>(null);
-  const [playing, setPlaying] = useState(false);
+export function VideoScreen({ fileId, initialFile, onBack }: Props) {
+  const [file, setFile] = useState<FileResponseDto | null>(initialFile || null);
+  const [playing, setPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
@@ -82,26 +83,36 @@ export function VideoScreen({ fileId, onBack }: Props) {
 
   useEffect(() => {
     setError(null);
-    setFile(null);
+    setFile(initialFile || null);
     setUseStream(false);
     setDuration(0);
     setStreamStart(0);
     setWaiting(false);
-  }, [fileId]);
+  }, [fileId, initialFile]);
 
   useEffect(() => {
     if (!fileId) return;
-    getFile(fileId).then(f => {
-      setFile(f);
-      // Use stream endpoint if codec needs transcoding (not H.264/AVC baseline)
-      const needsTranscode = f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase());
+
+    const configureFile = (f: FileResponseDto) => {
+      const isPlayableContainer = f.extension && ['mp4', 'm4v', 'mov', 'webm'].includes(f.extension.toLowerCase());
+      const needsTranscode = !isPlayableContainer || (f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase()));
       setUseStream(!!needsTranscode);
       if (f.duration) {
         const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
         setDuration(secs);
       }
-    });
-  }, [fileId]);
+    };
+
+    if (initialFile && initialFile.id === fileId) {
+      setFile(initialFile);
+      configureFile(initialFile);
+    } else {
+      getFile(fileId).then(f => {
+        setFile(f);
+        configureFile(f);
+      });
+    }
+  }, [fileId, initialFile]);
 
   const videoSrc = (fileId != null && file != null)
     ? (useStream ? getFileStreamUrl(fileId, streamStart) : getFileContentUrl(fileId, false))
@@ -115,7 +126,8 @@ export function VideoScreen({ fileId, onBack }: Props) {
     }
   }, [videoSrc]);
 
-  const needsTranscoding = file?.videoCodec && !['h264', 'avc', 'avc1'].includes((file.videoCodec || '').toLowerCase());
+  const isPlayableContainer = file?.extension && ['mp4', 'm4v', 'mov', 'webm'].includes(file.extension.toLowerCase());
+  const needsTranscoding = !isPlayableContainer || (file?.videoCodec && !['h264', 'avc', 'avc1'].includes((file.videoCodec || '').toLowerCase()));
 
   function handleTimeUpdate() {
     const v = videoRef.current;
@@ -157,6 +169,7 @@ export function VideoScreen({ fileId, onBack }: Props) {
       ref={containerRef}
       className={`video-page${isFullscreen ? ' is-fullscreen' : ''}${hideControls ? ' hide-controls' : ''}`}
       onMouseMove={handleMouseMove}
+      onClick={handleMouseMove}
     >
       <style>{videoStyles}</style>
 

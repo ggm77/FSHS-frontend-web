@@ -6,7 +6,7 @@ import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from
 
 interface Props {
   rootFolderId: number | null;
-  onOpenVideo: (fileId: number) => void;
+  onOpenVideo: (fileId: number, fileData?: FileResponseDto) => void;
   onOpenFile: (fileId: number) => void;
 }
 
@@ -408,7 +408,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       className={'file-row' + (selected === f.id ? ' selected' : '')}
                       onClick={() => {
                         setSelected(f.id);
-                        if (f.category === 'VIDEO') onOpenVideo(f.id);
+                        if (f.category === 'VIDEO') onOpenVideo(f.id, f);
                         else onOpenFile(f.id);
                       }}>
                       <div className="file-name">
@@ -466,7 +466,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   {folder.files.map((f) => (
                     <div className="grid-card" key={`file-${f.id}`}
                       onClick={() => {
-                        if (f.category === 'VIDEO') onOpenVideo(f.id);
+                        if (f.category === 'VIDEO') onOpenVideo(f.id, f);
                         else onOpenFile(f.id);
                       }}>
                       <div className="gc-head">
