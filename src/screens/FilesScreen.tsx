@@ -50,6 +50,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  const [showUploadStatus, setShowUploadStatus] = useState(false);
+  const [uploadingFileName, setUploadingFileName] = useState('');
+  const [uploadCurrentIndex, setUploadCurrentIndex] = useState(0);
+  const [uploadTotalFiles, setUploadTotalFiles] = useState(0);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,16 +121,30 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   async function handleUpload(files: FileList | null) {
     if (!files || !currentFolderId) return;
+    const filesArray = Array.from(files);
     setUploading(true);
+    setShowUploadStatus(true);
     setUploadPct(0);
+    setUploadTotalFiles(filesArray.length);
     try {
-      for (const file of Array.from(files)) {
+      for (let i = 0; i < filesArray.length; i++) {
+        const file = filesArray[i];
+        setUploadingFileName(file.name);
+        setUploadCurrentIndex(i + 1);
+        setUploadPct(0);
         await uploadFile(currentFolderId, file, setUploadPct);
       }
+      setUploadPct(100);
       await new Promise(r => setTimeout(r, 500));
       loadFolder(currentFolderId);
     } finally {
       setUploading(false);
+      setTimeout(() => {
+        setShowUploadStatus(false);
+        setUploadingFileName('');
+        setUploadCurrentIndex(0);
+        setUploadTotalFiles(0);
+      }, 2000);
     }
   }
 
@@ -317,6 +335,37 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           </div>
         ) : null}
       </div>
+
+      {showUploadStatus && (
+        <div className="upload-status-widget">
+          <div className="widget-header">
+            <span className="title">
+              {uploading ? (
+                <>
+                  <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
+                  파일 업로드 중 ({uploadCurrentIndex}/{uploadTotalFiles})
+                </>
+              ) : (
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'rgba(52, 199, 89, 0.2)', color: '#34c759', marginRight: 8 }}>
+                    <Icon name="check" size={11} stroke={3} />
+                  </span>
+                  업로드 완료
+                </>
+              )}
+            </span>
+          </div>
+          <div className="widget-body">
+            <div className="file-info-row">
+              <span className="file-name-txt">{uploadingFileName || '준비 중...'}</span>
+              <span className="pct-txt">{uploadPct}%</span>
+            </div>
+            <div className="widget-progress-bg">
+              <div className="widget-progress-fill" style={{ width: `${uploadPct}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -385,4 +434,100 @@ const filesStyles = `
   .grid-card .gc-head{ display:flex; align-items:center; gap:10px; padding:12px 12px 10px; font-size:13px; font-weight:600; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .grid-card .gc-prev{ height:130px; margin:0 12px 12px; border-radius:9px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
+
+  .upload-status-widget {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 320px;
+    background: rgba(30, 32, 40, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .upload-status-widget .widget-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .upload-status-widget .widget-header .title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+  }
+
+  .upload-status-widget .widget-body {
+    padding: 16px;
+  }
+
+  .upload-status-widget .file-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+
+  .upload-status-widget .file-name-txt {
+    font-size: 12.5px;
+    color: #fff;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .upload-status-widget .pct-txt {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .upload-status-widget .widget-progress-bg {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .upload-status-widget .widget-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent, #5b50e8), #8b62f0);
+    border-radius: 99px;
+    transition: width 0.15s ease-out;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .upload-status-widget .spin-icon {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+  }
 `;
