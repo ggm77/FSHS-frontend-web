@@ -59,13 +59,13 @@ function Avatar({ username, size = 32 }: { username: string; size?: number }) {
   );
 }
 
-function Sidebar({ active, onNav, user }: { active: string; onNav: (id: string) => void; user: UserResponseDto | null }) {
+function Sidebar({ active, onNav, user, className }: { active: string; onNav: (id: string) => void; user: UserResponseDto | null; className?: string }) {
   const storageUsed = 412;
   const storageTotal = 1024;
   const pct = Math.round((storageUsed / storageTotal) * 100);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${className || ''}`}>
       <div className="sb-brand">
         <div className="logo">F</div>
         <div>
@@ -112,15 +112,19 @@ function Sidebar({ active, onNav, user }: { active: string; onNav: (id: string) 
   );
 }
 
-function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout }: {
+function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
   crumbs: string[];
   onSearch: () => void;
   dark: boolean;
   onToggleDark: () => void;
   onLogout: () => void;
+  onMenuClick: () => void;
 }) {
   return (
     <div className="topbar">
+      <button className="tb-menu-btn" onClick={onMenuClick}>
+        <Icon name="menu" size={20} stroke={2} />
+      </button>
       <div className="crumbs">
         {crumbs.map((c, i) => (
           <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -152,6 +156,7 @@ export default function App() {
   const [_username, setUsername] = useState('');
   const [videoFileId, setVideoFileId] = useState<number | null>(null);
   const [viewerFileId, setViewerFileId] = useState<number | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -247,6 +252,7 @@ export default function App() {
     if (id === 'logout') { handleLogout(); return; }
     setScreen(id as Screen);
     window.history.replaceState({ screen: id }, '');
+    setSidebarOpen(false);
   }
 
   function openVideo(fileId: number) {
@@ -295,7 +301,8 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar active={screen} onNav={handleNav} user={user} />
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+      <Sidebar active={screen} onNav={handleNav} user={user} className={sidebarOpen ? 'open' : ''} />
       <main className="main">
         <TopBar
           crumbs={CRUMBS[screen] || ['홈']}
@@ -303,6 +310,7 @@ export default function App() {
           dark={dark}
           onToggleDark={() => setDark(v => !v)}
           onLogout={handleLogout}
+          onMenuClick={() => setSidebarOpen(true)}
         />
         {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
         {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}

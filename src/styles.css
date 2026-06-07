@@ -322,3 +322,103 @@ button{font-family:inherit; color:inherit; cursor:pointer}
 .modal{ background:var(--bg); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); max-width:90%; animation:slideUp .2s ease; }
 
 .badge-codec{ display:inline-flex; align-items:center; gap:4px; height:18px; padding:0 6px; border-radius:5px; background:var(--surface-1); font-size:10.5px; font-weight:600; color:var(--fg-2); font-family:'JetBrains Mono', monospace; }
+
+.tb-menu-btn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  place-items: center;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .tb-menu-btn {
+    display: grid;
+  }
+  
+  .app {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    z-index: 110;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: none;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0) !important;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5) !important;
+  }
+  
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 100;
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .topbar {
+    padding: 10px 14px !important;
+    height: 56px !important;
+    gap: 8px !important;
+  }
+  
+  .tb-search {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  .tb-search .t, .tb-search kbd {
+    display: none !important;
+  }
+  
+  .content {
+    padding: 12px 14px !important;
+  }
+  
+  .folder-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .file-row {
+    grid-template-columns: minmax(0, 3fr) 1fr 60px !important;
+    padding: 0 12px !important;
+  }
+  
+  .file-row > div:nth-child(2),
+  .file-row > div:nth-child(3) {
+    display: none !important;
+  }
+  
+  .files-toolbar {
+    padding: 4px 2px 12px !important;
+    gap: 6px !important;
+  }
+}

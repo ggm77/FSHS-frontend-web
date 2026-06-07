@@ -1,4 +1,5 @@
 const PATHS: Record<string, string> = {
+  menu:        '<path d="M3 12h18M3 6h18M3 18h18"/>',
   files:       '<path d="M3 6.5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   gallery:     '<rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="m21 16-5-5L5 21"/>',
   video:       '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none"/>',
