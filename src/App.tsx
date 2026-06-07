@@ -5,7 +5,6 @@ import { LoginScreen } from './screens/LoginScreen';
 import { FilesScreen } from './screens/FilesScreen';
 import { GalleryScreen } from './screens/GalleryScreen';
 import { VideoScreen } from './screens/VideoScreen';
-import { MusicScreen } from './screens/MusicScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { SyncScreen } from './screens/SyncScreen';
 import { ShareScreen } from './screens/ShareScreen';
@@ -15,14 +14,12 @@ import { logout } from './api/auth';
 import { getUser } from './api/users';
 import type { UserResponseDto } from './types';
 
-type Screen = 'files' | 'gallery' | 'video' | 'music' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+type Screen = 'files' | 'gallery' | 'video' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
 
 const NAV = [
   { group: '라이브러리', items: [
     { id: 'files',   label: '파일',   icon: 'files' },
     { id: 'gallery', label: '갤러리', icon: 'gallery' },
-    { id: 'video',   label: '비디오', icon: 'video' },
-    { id: 'music',   label: '음악',   icon: 'music' },
   ]},
   { group: '도구', items: [
     { id: 'search', label: '검색',   icon: 'search' },
@@ -38,8 +35,6 @@ const NAV = [
 const CRUMBS: Record<string, string[]> = {
   files:   ['파일', '내 보관함'],
   gallery: ['갤러리'],
-  video:   ['비디오'],
-  music:   ['음악'],
   search:  ['검색'],
   sync:    ['동기화'],
   share:   ['공유'],
@@ -230,7 +225,6 @@ export default function App() {
         />
         {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
         {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
-        {screen === 'music'   && <MusicScreen rootFolderId={rootFolderId} />}
         {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
         {screen === 'sync'    && <SyncScreen />}
         {screen === 'share'   && <ShareScreen />}
