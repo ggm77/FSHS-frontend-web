@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, getCookie } from './client';
 import type { FileResponseDto, FileStatusDto } from '../types';
 
 export function getFile(fileId: number): Promise<FileResponseDto> {
@@ -23,6 +23,12 @@ export async function uploadFile(
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/v2/files');
     xhr.withCredentials = true;
+
+    const xsrfToken = getCookie('XSRF-TOKEN');
+    if (xsrfToken) {
+      xhr.setRequestHeader('X-XSRF-TOKEN', xsrfToken);
+    }
+
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));
