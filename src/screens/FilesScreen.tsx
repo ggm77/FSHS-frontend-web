@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, getFolderDownloadUrl } from '../api/folders';
-import { uploadFile, deleteFile, getFileContentUrl, formatBytes } from '../api/files';
+import { uploadFile, deleteFile, getFileContentUrl, formatBytes, getFileStatus } from '../api/files';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
 
 interface Props {
@@ -47,13 +47,16 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  interface UploadItem {
+    name: string;
+    pct: number;
+    status: 'UPLOADING' | 'PROCESSING' | 'COMPLETE' | 'ERROR';
+  }
+
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
-  const [uploadingFileName, setUploadingFileName] = useState('');
-  const [uploadCurrentIndex, setUploadCurrentIndex] = useState(0);
-  const [uploadTotalFiles, setUploadTotalFiles] = useState(0);
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,29 +125,76 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   async function handleUpload(files: FileList | null) {
     if (!files || !currentFolderId) return;
     const filesArray = Array.from(files);
-    setUploading(true);
+    
+    // Initialize items
+    const newItems: UploadItem[] = filesArray.map(f => ({
+      name: f.name,
+      pct: 0,
+      status: 'UPLOADING'
+    }));
+    
+    setUploadItems(newItems);
     setShowUploadStatus(true);
-    setUploadPct(0);
-    setUploadTotalFiles(filesArray.length);
+    setUploading(true);
+
+    const pollingPromises: Promise<void>[] = [];
+
     try {
       for (let i = 0; i < filesArray.length; i++) {
         const file = filesArray[i];
-        setUploadingFileName(file.name);
-        setUploadCurrentIndex(i + 1);
-        setUploadPct(0);
-        await uploadFile(currentFolderId, file, setUploadPct);
+        
+        // 1. Upload the file
+        const uuid = await uploadFile(currentFolderId, file, (pct) => {
+          setUploadItems(prev => prev.map(item => 
+            item.name === file.name ? { ...item, pct } : item
+          ));
+        });
+
+        // 2. Upload complete, transition to PROCESSING
+        setUploadItems(prev => prev.map(item => 
+          item.name === file.name ? { ...item, pct: 100, status: 'PROCESSING' } : item
+        ));
+
+        // 3. Start polling in the background (non-blocking)
+        const pollPromise = new Promise<void>((resolve) => {
+          const interval = setInterval(async () => {
+            try {
+              const res = await getFileStatus(uuid);
+              if (res.status === 'COMPLETE') {
+                clearInterval(interval);
+                setUploadItems(prev => prev.map(item => 
+                  item.name === file.name ? { ...item, status: 'COMPLETE' } : item
+                ));
+                loadFolder(currentFolderId); // Refresh folder immediately!
+                resolve();
+              } else if (res.status === 'ERROR') {
+                clearInterval(interval);
+                setUploadItems(prev => prev.map(item => 
+                  item.name === file.name ? { ...item, status: 'ERROR' } : item
+                ));
+                resolve();
+              }
+            } catch (err) {
+              console.error('Error polling status:', err);
+            }
+          }, 1500);
+        });
+        
+        pollingPromises.push(pollPromise);
       }
-      setUploadPct(100);
-      await new Promise(r => setTimeout(r, 500));
+      
+      // Wait for all background polling processes to complete
+      await Promise.all(pollingPromises);
       loadFolder(currentFolderId);
+    } catch (err) {
+      console.error('Upload sequence error:', err);
+      setError('파일 업로드 또는 처리 중 오류가 발생했습니다.');
     } finally {
       setUploading(false);
       setTimeout(() => {
         setShowUploadStatus(false);
-        setUploadingFileName('');
-        setUploadCurrentIndex(0);
-        setUploadTotalFiles(0);
-      }, 2000);
+        setUploadItems([]);
+      }, 3000);
     }
   }
 
@@ -176,7 +226,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => handleUpload(e.target.files)} />
           <button className="btn primary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             <Icon name="upload" size={16} color="var(--accent-fg)" />
-            {uploading ? `업로드 중 ${uploadPct}%` : '업로드'}
+            {uploading ? '업로드 중...' : '업로드'}
           </button>
           <div style={{ position: 'relative' }}>
             <button className="btn" onClick={() => setNewFolderName(v => v ? '' : '새 폴더')}>
@@ -343,26 +393,40 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
               {uploading ? (
                 <>
                   <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
-                  파일 업로드 중 ({uploadCurrentIndex}/{uploadTotalFiles})
+                  파일 업로드 중 ({uploadItems.filter(i => i.status !== 'UPLOADING').length + 1}/{uploadItems.length})
+                </>
+              ) : uploadItems.some(i => i.status === 'PROCESSING') ? (
+                <>
+                  <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
+                  파일 처리 중...
                 </>
               ) : (
                 <>
                   <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'rgba(52, 199, 89, 0.2)', color: '#34c759', marginRight: 8 }}>
                     <Icon name="check" size={11} stroke={3} />
                   </span>
-                  업로드 완료
+                  완료 ({uploadItems.filter(i => i.status === 'COMPLETE').length}개 성공, {uploadItems.filter(i => i.status === 'ERROR').length}개 실패)
                 </>
               )}
             </span>
           </div>
-          <div className="widget-body">
-            <div className="file-info-row">
-              <span className="file-name-txt">{uploadingFileName || '준비 중...'}</span>
-              <span className="pct-txt">{uploadPct}%</span>
-            </div>
-            <div className="widget-progress-bg">
-              <div className="widget-progress-fill" style={{ width: `${uploadPct}%` }} />
-            </div>
+          <div className="widget-body" style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {uploadItems.map((item, idx) => (
+              <div className="widget-item" key={idx} style={{ marginBottom: idx < uploadItems.length - 1 ? 12 : 0 }}>
+                <div className="file-info-row">
+                  <span className="file-name-txt" title={item.name}>{item.name}</span>
+                  <span className="pct-txt">
+                    {item.status === 'UPLOADING' && `${item.pct}%`}
+                    {item.status === 'PROCESSING' && '처리 중...'}
+                    {item.status === 'COMPLETE' && '완료'}
+                    {item.status === 'ERROR' && '실패'}
+                  </span>
+                </div>
+                <div className="widget-progress-bg">
+                  <div className={`widget-progress-fill ${item.status.toLowerCase()}`} style={{ width: `${item.pct}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -520,6 +584,21 @@ const filesStyles = `
     background: linear-gradient(90deg, var(--accent, #5b50e8), #8b62f0);
     border-radius: 99px;
     transition: width 0.15s ease-out;
+  }
+  .upload-status-widget .widget-progress-fill.processing {
+    background: linear-gradient(90deg, #f39c12, #f1c40f);
+    animation: pulse 1.5s infinite;
+  }
+  .upload-status-widget .widget-progress-fill.complete {
+    background: #2ecc71;
+  }
+  .upload-status-widget .widget-progress-fill.error {
+    background: #e74c3c;
+  }
+  @keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
   }
 
   @keyframes spin {
