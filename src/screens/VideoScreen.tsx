@@ -96,7 +96,15 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     const configureFile = (f: FileResponseDto) => {
       const isPlayableContainer = f.extension && ['mp4', 'webm'].includes(f.extension.toLowerCase());
       const needsTranscode = !isPlayableContainer || (f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase()));
-      setUseStream(!!needsTranscode);
+      
+      // Safari/iOS Safari 및 iOS 내 모든 브라우저 앱인 경우, 
+      // 로컬 Vite Proxy와 미디어 데몬의 Range Requests 처리 이상(500 에러)을 피하기 위해
+      // 실시간 트랜스코딩 스트림(/stream API, Range 미사용)을 강제합니다.
+      const ua = navigator.userAgent.toLowerCase();
+      const isSafari = /safari/.test(ua) && !/chrome|chromium|android|crios/.test(ua);
+      const isIOS = /iphone|ipad|ipod/.test(ua);
+      setUseStream(!!needsTranscode || isSafari || isIOS);
+
       if (f.duration) {
         const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
         setDuration(secs);
@@ -183,7 +191,6 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             ref={videoRef}
             playsInline
             preload="auto"
-            crossOrigin="use-credentials"
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
