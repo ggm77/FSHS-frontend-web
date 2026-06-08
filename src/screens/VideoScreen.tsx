@@ -122,7 +122,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     const v = videoRef.current;
     if (!v || !videoSrc) return;
     if (playing) {
-      v.play().catch(() => setPlaying(false));
+      v.play().catch((err) => {
+        console.warn('Autoplay blocked or failed:', err);
+        setPlaying(false);
+      });
     }
   }, [videoSrc]);
 
@@ -176,9 +179,11 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       <div className="video-stage">
         {videoSrc ? (
           <video
+            key={videoSrc}
             ref={videoRef}
-            src={videoSrc || undefined}
             playsInline
+            preload="auto"
+            crossOrigin="use-credentials"
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
@@ -212,7 +217,9 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
                 setError('비디오를 로드하는 중 오류가 발생했습니다.');
               }
             }}
-          />
+          >
+            <source src={videoSrc} type={useStream ? "video/mp4" : (file?.extension ? `video/${file.extension.toLowerCase()}` : "video/mp4")} />
+          </video>
         ) : (
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <Icon name="spinner" size={28} />
