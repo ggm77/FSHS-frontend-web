@@ -94,7 +94,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (!fileId) return;
 
     const configureFile = (f: FileResponseDto) => {
-      const isPlayableContainer = f.extension && ['mp4', 'm4v', 'mov', 'webm'].includes(f.extension.toLowerCase());
+      const isPlayableContainer = f.extension && ['mp4', 'webm'].includes(f.extension.toLowerCase());
       const needsTranscode = !isPlayableContainer || (f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase()));
       setUseStream(!!needsTranscode);
       if (f.duration) {
@@ -126,7 +126,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     }
   }, [videoSrc]);
 
-  const isPlayableContainer = file?.extension && ['mp4', 'm4v', 'mov', 'webm'].includes(file.extension.toLowerCase());
+  const isPlayableContainer = file?.extension && ['mp4', 'webm'].includes(file.extension.toLowerCase());
   const needsTranscoding = !isPlayableContainer || (file?.videoCodec && !['h264', 'avc', 'avc1'].includes((file.videoCodec || '').toLowerCase()));
 
   function handleTimeUpdate() {
@@ -177,7 +177,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         {videoSrc ? (
           <video
             ref={videoRef}
-            src={videoSrc}
+            src={videoSrc || undefined}
             playsInline
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
