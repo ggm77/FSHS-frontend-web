@@ -146,10 +146,11 @@ export function LoginScreen({ onSignIn }: Props) {
 
 const loginStyles = `
   .login-shell{
-    height:100vh; width:100vw;
+    min-height:100vh; width:100%;
     display:grid; place-items:center;
     background:var(--bg-shell);
     padding:24px;
+    box-sizing:border-box;
   }
   .login-card{
     width:100%; max-width:920px;
@@ -195,13 +196,49 @@ const loginStyles = `
   }
 
   .login-right{
+    min-width:0;
     padding:48px 44px;
     display:flex; flex-direction:column; justify-content:center;
     background:var(--bg);
   }
+
+  @media (max-width: 640px) {
+    .login-shell{
+      padding:16px;
+      align-items:flex-start;
+      justify-items:stretch;
+      padding-top:env(safe-area-inset-top, 16px);
+    }
+    .login-card{
+      width:100%;
+      grid-template-columns:1fr;
+      min-height:unset;
+      border-radius:16px;
+    }
+    .login-left{
+      padding:28px 24px 20px;
+    }
+    .login-left .logo{
+      width:36px; height:36px; font-size:18px; border-radius:10px;
+      margin-bottom:16px;
+    }
+    .login-left h2{
+      font-size:22px;
+    }
+    .login-left .lead{
+      font-size:13.5px;
+    }
+    .login-left .feat-list{
+      display:none;
+    }
+    .login-right{
+      padding:24px 24px 32px;
+    }
+  }
+
   .field{margin-bottom:18px}
   .field .input{
-    position:relative;
+    position:relative; min-width:0;
     display:flex; align-items:center;
     height:54px; padding:0 16px;
     background:var(--bg);
@@ -213,7 +250,7 @@ const loginStyles = `
     border-color:var(--accent); border-width:2px; padding:0 15px;
   }
   .field .input input{
-    flex:1; border:0; background:transparent; color:var(--fg);
+    flex:1; min-width:0; border:0; background:transparent; color:var(--fg);
     font:inherit; font-size:16px; outline:none;
   }
   .field .input .lbl{
