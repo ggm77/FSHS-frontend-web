@@ -68,6 +68,12 @@ export function getFileStreamUrl(fileId: number, start = 0): string {
   return `/api/v2/files/${fileId}/stream?start=${start}`;
 }
 
+// HLS 재생목록(.m3u8). 세그먼트(segmentN.ts)는 재생목록 내 상대경로로
+// 같은 디렉터리(/stream/)에서 자동 요청되므로 별도 URL이 필요 없습니다.
+export function getFileHlsUrl(fileId: number): string {
+  return `/api/v2/files/${fileId}/stream/index.m3u8`;
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '../components/Icon';
-import { getFile, getFileStreamUrl, getFileContentUrl, formatBytes } from '../api/files';
+import { getFile, getFileStreamUrl, getFileHlsUrl, getFileContentUrl, formatBytes } from '../api/files';
 import type { FileResponseDto } from '../types';
 
 interface Props {
@@ -32,6 +32,11 @@ function isAppleWebKit(): boolean {
 
 const APPLE_WEBKIT = isAppleWebKit();
 
+// 트랜스코딩이 필요할 때 쓰는 전송 방식.
+// 사파리/iOS는 progressive /stream(Range 미지원)을 못 틀기 때문에 HLS(네이티브 지원)로,
+// 그 외 브라우저는 HLS 네이티브 지원이 없으므로 기존 progressive /stream으로 보냅니다.
+const TRANSCODE_METHOD: 'hls' | 'stream' = APPLE_WEBKIT ? 'hls' : 'stream';
+
 const H264_CODECS = ['h264', 'avc', 'avc1'];
 const HEVC_CODECS = ['hevc', 'h265', 'hvc1', 'hev1'];
 
@@ -60,7 +65,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [_volume, setVolume] = useState(1);
-  const [useStream, setUseStream] = useState(false);
+  // autoStream: 파일/브라우저 기준 자동 판별값. forcedMode: 사용자가 수동으로 고른 재생 방식(없으면 자동).
+  const [autoStream, setAutoStream] = useState(false);
+  const [forcedMode, setForcedMode] = useState<'content' | 'stream' | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [streamStart, setStreamStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
@@ -70,6 +78,14 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeTimeoutRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const resumeAtRef = useRef<number | null>(null);
+
+  // 실제 트랜스코딩 사용 여부: 수동 선택이 있으면 그것을, 없으면 자동 판별값을 따릅니다.
+  const useTranscode = forcedMode ? forcedMode === 'stream' : autoStream;
+  // progressive /stream만 시킹 시 URL을 갈아끼워 재로딩이 필요합니다.
+  // HLS와 /content는 전체 구간이 있어 네이티브 시킹(v.currentTime)이 됩니다.
+  const reloadSeek = useTranscode && TRANSCODE_METHOD === 'stream';
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -120,7 +136,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   useEffect(() => {
     setError(null);
     setFile(initialFile || null);
-    setUseStream(false);
+    setAutoStream(false);
+    setForcedMode(null);
+    setShowSettings(false);
+    resumeAtRef.current = null;
     setDuration(0);
     setStreamStart(0);
     setWaiting(false);
@@ -130,11 +149,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (!fileId) return;
 
     const configureFile = (f: FileResponseDto) => {
-      // 브라우저가 원본을 네이티브로 재생할 수 있으면 /content(Range 바이트 서빙)로 직접 재생하고,
-      // 불가능하면 실시간 트랜스코딩(/stream)으로 전송합니다.
-      // 단 사파리/iOS는 /stream(Range 미지원)을 재생하지 못하므로, HEVC·MOV처럼
-      // 사파리가 직접 디코딩 가능한 포맷은 트랜스코딩 대신 /content로 보냅니다.
-      setUseStream(!canPlayNativeFile(f.extension, f.videoCodec));
+      // 원본을 네이티브로 재생 가능하면 /content(Range 바이트 서빙)로 직접 재생하고,
+      // 불가능하면 실시간 트랜스코딩으로 전송합니다. 트랜스코딩 전송 방식은 브라우저별로 달라서
+      // (TRANSCODE_METHOD) 사파리/iOS는 HLS, 그 외는 progressive /stream을 씁니다.
+      setAutoStream(!canPlayNativeFile(f.extension, f.videoCodec));
 
       if (f.duration) {
         const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
@@ -154,7 +172,9 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   }, [fileId, initialFile]);
 
   const videoSrc = (fileId != null && file != null)
-    ? (useStream ? getFileStreamUrl(fileId, streamStart) : getFileContentUrl(fileId, false))
+    ? (useTranscode
+        ? (TRANSCODE_METHOD === 'hls' ? getFileHlsUrl(fileId) : getFileStreamUrl(fileId, streamStart))
+        : getFileContentUrl(fileId, false))
     : '';
 
   useEffect(() => {
@@ -167,8 +187,6 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       });
     }
   }, [videoSrc]);
-
-  const needsTranscoding = file ? !canPlayNativeFile(file.extension, file.videoCodec) : false;
 
   function handleTimeUpdate() {
     const v = videoRef.current;
@@ -184,7 +202,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     const pct = (e.clientX - rect.left) / rect.width;
     const targetTime = pct * duration;
 
-    if (useStream) {
+    if (reloadSeek) {
       setStreamStart(targetTime);
       setCurrentTime(targetTime);
       setBuffered(targetTime);
@@ -199,6 +217,37 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (playing) v.pause(); else v.play();
     setPlaying(!playing);
   }
+
+  // 사용자가 재생 방식(일반 재생 / 실시간 트랜스코딩)을 직접 고르는 핸들러.
+  // 현재 재생 위치를 유지한 채 방식만 전환합니다.
+  function selectMode(mode: 'content' | 'stream') {
+    setShowSettings(false);
+    if (useTranscode === (mode === 'stream')) return; // 이미 같은 방식이면 무시
+    const t = currentTime;
+    if (mode === 'stream' && TRANSCODE_METHOD === 'stream') {
+      // progressive 트랜스코딩: 현재 위치부터 변환 시작 (URL 재로딩)
+      setStreamStart(t);
+      setCurrentTime(t);
+      setBuffered(t);
+    } else {
+      // 일반 재생(/content) 또는 HLS 트랜스코딩: 로드 후 onLoadedMetadata에서 현재 위치로 시크
+      setStreamStart(0);
+      resumeAtRef.current = t;
+    }
+    setForcedMode(mode);
+  }
+
+  // 설정 메뉴 바깥을 누르면 닫기
+  useEffect(() => {
+    if (!showSettings) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDocPointerDown);
+    return () => document.removeEventListener('pointerdown', onDocPointerDown);
+  }, [showSettings]);
 
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
@@ -224,8 +273,13 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
-              if (!duration && videoRef.current) {
-                setDuration(videoRef.current.duration || 0);
+              const v = videoRef.current;
+              if (!v) return;
+              if (!duration) setDuration(v.duration || 0);
+              // 재생 방식 전환 시 직전 위치로 복원 (일반 재생 경로)
+              if (resumeAtRef.current != null) {
+                try { v.currentTime = resumeAtRef.current; } catch {}
+                resumeAtRef.current = null;
               }
             }}
             onPlay={() => setPlaying(true)}
@@ -255,7 +309,14 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
               }
             }}
           >
-            <source src={videoSrc} type={useStream ? "video/mp4" : (file?.mimeType || "video/mp4")} />
+            <source
+              src={videoSrc}
+              type={
+                useTranscode
+                  ? (TRANSCODE_METHOD === 'hls' ? 'application/vnd.apple.mpegurl' : 'video/mp4')
+                  : (file?.mimeType || 'video/mp4')
+              }
+            />
           </video>
         ) : (
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -306,14 +367,14 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
           </div>
         )}
 
-        {needsTranscoding && !isFullscreen && (
+        {useTranscode && !isFullscreen && (
           <div className="transcoding-hud">
             <div className="h">실시간 트랜스코딩 중</div>
             <div className="desc">
-              브라우저가 원본 코덱({file?.videoCodec})을 지원하지 않아 즉시 변환 후 전송 중입니다.
+              원본{file?.videoCodec ? ` 코덱(${file.videoCodec})` : ''}을 H.264로 실시간 변환해 전송 중입니다.
             </div>
             <div className="codec-row">
-              <span className="src">{file?.videoCodec}</span>
+              <span className="src">{file?.videoCodec || '원본'}</span>
               <span className="arrow">→</span>
               <span className="dst">H.264</span>
             </div>
@@ -352,6 +413,40 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
           }}>
             <Icon name="volume" size={16} stroke={1.5} color="#fff" />
           </button>
+          <div className="settings-wrap" ref={settingsRef}>
+            <button
+              className={`pbtn${showSettings ? ' active' : ''}`}
+              title="재생 방식"
+              onClick={() => setShowSettings((s) => !s)}
+            >
+              <Icon name="settings" size={16} stroke={1.5} color="#fff" />
+            </button>
+            {showSettings && (
+              <div className="settings-menu">
+                <div className="settings-head">재생 방식</div>
+                <button
+                  className={`settings-item${!useTranscode ? ' active' : ''}`}
+                  onClick={() => selectMode('content')}
+                >
+                  <div className="si-main">
+                    <span className="si-title">일반 재생</span>
+                    <span className="si-desc">원본 그대로 전송 · 빠름</span>
+                  </div>
+                  {!useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
+                </button>
+                <button
+                  className={`settings-item${useTranscode ? ' active' : ''}`}
+                  onClick={() => selectMode('stream')}
+                >
+                  <div className="si-main">
+                    <span className="si-title">실시간 트랜스코딩</span>
+                    <span className="si-desc">H.264로 변환 · 호환성 ↑</span>
+                  </div>
+                  {useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
+                </button>
+              </div>
+            )}
+          </div>
           <button className="pbtn" title={isFullscreen ? '전체화면 종료' : '전체화면'} onClick={toggleFullscreen}>
             <Icon name="fullscreen" size={16} stroke={1.5} color="#fff" />
           </button>
@@ -482,7 +577,35 @@ const videoStyles = `
     width:44px; height:44px; border-radius:99px;
   }
   .pbtn.play:hover{opacity:1}
+  .pbtn.active{background:rgba(255,255,255,0.16); opacity:1}
   .player-row .stretch{flex:1}
+
+  .settings-wrap{position:relative; display:flex}
+  .settings-menu{
+    position:absolute; bottom:46px; right:0; z-index:30;
+    width:240px;
+    background:rgba(26,28,34,0.96);
+    backdrop-filter:blur(24px);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:14px; padding:6px;
+    box-shadow:0 16px 48px rgba(0,0,0,0.55);
+  }
+  .settings-head{
+    font-size:11px; font-weight:600; letter-spacing:0.02em;
+    color:#fff; opacity:0.5;
+    padding:8px 10px 6px;
+  }
+  .settings-item{
+    display:flex; align-items:center; gap:10px;
+    width:100%; text-align:left;
+    background:transparent; border:0; color:#fff;
+    padding:9px 10px; border-radius:9px; cursor:pointer;
+  }
+  .settings-item:hover{background:rgba(255,255,255,0.08)}
+  .settings-item.active{background:rgba(255,255,255,0.06)}
+  .settings-item .si-main{display:flex; flex-direction:column; gap:2px; flex:1; min-width:0}
+  .settings-item .si-title{font-size:13px; font-weight:500}
+  .settings-item .si-desc{font-size:11px; opacity:0.55}
   .video-buffering-overlay {
     position: absolute;
     top: 50%;
