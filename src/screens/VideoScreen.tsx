@@ -97,13 +97,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       const isPlayableContainer = f.extension && ['mp4', 'webm'].includes(f.extension.toLowerCase());
       const needsTranscode = !isPlayableContainer || (f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase()));
       
-      // Safari/iOS Safari 및 iOS 내 모든 브라우저 앱인 경우, 
-      // 로컬 Vite Proxy와 미디어 데몬의 Range Requests 처리 이상(500 에러)을 피하기 위해
-      // 실시간 트랜스코딩 스트림(/stream API, Range 미사용)을 강제합니다.
-      const ua = navigator.userAgent.toLowerCase();
-      const isSafari = /safari/.test(ua) && !/chrome|chromium|android|crios/.test(ua);
-      const isIOS = /iphone|ipad|ipod/.test(ua);
-      setUseStream(!!needsTranscode || isSafari || isIOS);
+      // H.264(브라우저 네이티브 재생 가능) 컨테이너는 /content(Range 바이트 서빙)로 직접 재생하고,
+      // 그 외 코덱/컨테이너만 실시간 트랜스코딩(/stream)으로 전송합니다.
+      // Safari/iOS도 Range 규격만 맞으면 /content로 네이티브 재생되므로 강제 스트림을 사용하지 않습니다.
+      setUseStream(!!needsTranscode);
 
       if (f.duration) {
         const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
