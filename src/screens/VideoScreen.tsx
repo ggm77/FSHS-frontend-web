@@ -17,6 +17,42 @@ function formatTime(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// 사파리/iOS(아이폰·아이패드)는 모든 브라우저가 WebKit이라 <video>에 Range(206)를 강하게 요구합니다.
+// 이런 환경에서는 라이브 트랜스코딩(/stream: 200 응답, Range 미지원)이 재생되지 않으므로,
+// 사파리가 네이티브로 디코딩 가능한 코덱/컨테이너는 /content(원본 + Range)로 직접 재생시킵니다.
+function isAppleWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const iOS = /iP(hone|ad|od)/.test(ua) ||
+    // iPadOS 13+는 데스크톱 맥으로 위장하므로 터치 포인트 수로 구분
+    (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+  const macSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua);
+  return iOS || macSafari;
+}
+
+const APPLE_WEBKIT = isAppleWebKit();
+
+const H264_CODECS = ['h264', 'avc', 'avc1'];
+const HEVC_CODECS = ['hevc', 'h265', 'hvc1', 'hev1'];
+
+// 해당 파일을 현재 브라우저가 트랜스코딩 없이 원본 그대로 재생할 수 있는지 판단합니다.
+function canPlayNativeFile(extension?: string | null, videoCodec?: string | null): boolean {
+  const ext = (extension || '').toLowerCase();
+  const codec = (videoCodec || '').toLowerCase();
+
+  if (APPLE_WEBKIT) {
+    // 사파리/iOS: MP4·MOV 계열 컨테이너 + H.264/HEVC는 네이티브 재생 가능
+    const okContainer = ['mp4', 'm4v', 'mov'].includes(ext);
+    const okCodec = !codec || H264_CODECS.includes(codec) || HEVC_CODECS.includes(codec);
+    return okContainer && okCodec;
+  }
+
+  // 크롬 등: MP4·WebM 컨테이너 + H.264만 네이티브 재생 (그 외는 트랜스코딩)
+  const okContainer = ['mp4', 'webm'].includes(ext);
+  const okCodec = !codec || H264_CODECS.includes(codec);
+  return okContainer && okCodec;
+}
+
 export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(initialFile || null);
   const [playing, setPlaying] = useState(true);
@@ -94,13 +130,11 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (!fileId) return;
 
     const configureFile = (f: FileResponseDto) => {
-      const isPlayableContainer = f.extension && ['mp4', 'webm'].includes(f.extension.toLowerCase());
-      const needsTranscode = !isPlayableContainer || (f.videoCodec && !['h264', 'avc', 'avc1'].includes(f.videoCodec.toLowerCase()));
-      
-      // H.264(브라우저 네이티브 재생 가능) 컨테이너는 /content(Range 바이트 서빙)로 직접 재생하고,
-      // 그 외 코덱/컨테이너만 실시간 트랜스코딩(/stream)으로 전송합니다.
-      // Safari/iOS도 Range 규격만 맞으면 /content로 네이티브 재생되므로 강제 스트림을 사용하지 않습니다.
-      setUseStream(!!needsTranscode);
+      // 브라우저가 원본을 네이티브로 재생할 수 있으면 /content(Range 바이트 서빙)로 직접 재생하고,
+      // 불가능하면 실시간 트랜스코딩(/stream)으로 전송합니다.
+      // 단 사파리/iOS는 /stream(Range 미지원)을 재생하지 못하므로, HEVC·MOV처럼
+      // 사파리가 직접 디코딩 가능한 포맷은 트랜스코딩 대신 /content로 보냅니다.
+      setUseStream(!canPlayNativeFile(f.extension, f.videoCodec));
 
       if (f.duration) {
         const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
@@ -134,8 +168,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     }
   }, [videoSrc]);
 
-  const isPlayableContainer = file?.extension && ['mp4', 'webm'].includes(file.extension.toLowerCase());
-  const needsTranscoding = !isPlayableContainer || (file?.videoCodec && !['h264', 'avc', 'avc1'].includes((file.videoCodec || '').toLowerCase()));
+  const needsTranscoding = file ? !canPlayNativeFile(file.extension, file.videoCodec) : false;
 
   function handleTimeUpdate() {
     const v = videoRef.current;
@@ -222,7 +255,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
               }
             }}
           >
-            <source src={videoSrc} type={useStream ? "video/mp4" : (file?.extension ? `video/${file.extension.toLowerCase()}` : "video/mp4")} />
+            <source src={videoSrc} type={useStream ? "video/mp4" : (file?.mimeType || "video/mp4")} />
           </video>
         ) : (
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
