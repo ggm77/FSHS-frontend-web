@@ -13,9 +13,20 @@ import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { logout } from './api/auth';
 import { getUser } from './api/users';
+import { ApiError } from './api/client';
 import type { UserResponseDto, FileResponseDto } from './types';
 
 type Screen = 'files' | 'gallery' | 'video' | 'viewer' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+
+// localStorage에 캐시된 사용자 정보를 안전하게 읽는다.
+function loadCachedUser(): UserResponseDto | null {
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? (JSON.parse(stored) as UserResponseDto) : null;
+  } catch {
+    return null;
+  }
+}
 
 const NAV = [
   { group: '라이브러리', items: [
@@ -141,11 +152,10 @@ function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }:
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(false);
+  const [authed, setAuthed] = useState(() => loadCachedUser() !== null);
   const [screen, setScreen] = useState<Screen>('files');
   const [dark, setDark] = useState(false);
-  const [user, setUser] = useState<UserResponseDto | null>(null);
-  const [_username, setUsername] = useState('');
+  const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [videoFileId, setVideoFileId] = useState<number | null>(null);
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
   const [viewerFileId, setViewerFileId] = useState<number | null>(null);
@@ -198,29 +208,46 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) {
-      try {
-        const u: UserResponseDto = JSON.parse(stored);
-        getUser(u.id)
-          .then(verified => {
-            setUser(verified);
-            setAuthed(true);
-            localStorage.setItem('user', JSON.stringify(verified));
-          })
-          .catch(() => {
-            localStorage.removeItem('user');
-            setAuthed(false);
-            setUser(null);
-          });
-      } catch {
-        localStorage.removeItem('user');
-      }
-    }
+    const cached = loadCachedUser();
+    if (!cached) return;
+
+    // 캐시된 정보로 이미 로그인 상태를 보여주고 있으므로,
+    // 백그라운드에서 세션이 유효한지만 조용히 확인한다.
+    getUser(cached.id)
+      .then(verified => {
+        setUser(verified);
+        localStorage.setItem('user', JSON.stringify(verified));
+      })
+      .catch(err => {
+        // 세션이 실제로 만료/무효일 때(401·403)에만 로그아웃한다.
+        // 네트워크 끊김이나 서버 일시 오류(5xx 등)로는 로그인을 풀지 않는다.
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          localStorage.removeItem('user');
+          setAuthed(false);
+          setUser(null);
+        }
+      });
   }, []);
 
+  // 로그인 상태에서 페이지가 열려 있는 동안 주기적으로 세션을 갱신한다.
+  // 잠시 자리를 비워도 서버 세션 타임아웃으로 로그인이 풀리지 않게 해준다.
+  // (모바일에서 앱을 장시간 백그라운드로 두면 타이머가 멈춰 효과가 제한적이다.)
+  useEffect(() => {
+    if (!authed || !user) return;
+    const userId = user.id;
+    const timer = setInterval(() => {
+      getUser(userId).catch(err => {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          localStorage.removeItem('user');
+          setAuthed(false);
+          setUser(null);
+        }
+      });
+    }, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [authed, user]);
+
   async function handleSignIn(uname: string) {
-    setUsername(uname);
     setAuthed(true);
     // Try to find the current user by trying sequential IDs
     for (let i = 1; i <= 20; i++) {
@@ -239,7 +266,6 @@ export default function App() {
     await logout();
     setAuthed(false);
     setUser(null);
-    setUsername('');
     localStorage.removeItem('user');
   }
 
