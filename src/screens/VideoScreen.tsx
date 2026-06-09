@@ -1,5 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import Hls from 'hls.js';
+import Hls, { XhrLoader } from 'hls.js';
+import type {
+  HlsConfig,
+  Loader,
+  LoaderCallbacks,
+  LoaderConfiguration,
+  LoaderContext,
+  LoaderStats,
+  PlaylistLoaderContext,
+} from 'hls.js';
 import { Icon } from '../components/Icon';
 import { getFile, getFileStreamUrl, getFileHlsUrl, getFileContentUrl, formatBytes } from '../api/files';
 import type { FileResponseDto } from '../types';
@@ -49,6 +58,138 @@ function canPlayNativeHls(): boolean {
 
 function canPlayManagedHls(): boolean {
   return typeof window !== 'undefined' && Hls.isSupported();
+}
+
+function isTranscodePlaylistUrl(url: string): boolean {
+  return /\/stream\/index\.m3u8(?:[?#]|$)/.test(url);
+}
+
+function withCacheBust(url: string): string {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}_hls_reload=${Date.now()}`;
+}
+
+function rewriteTranscodePlaylist(playlist: string, expectedDuration: number): string {
+  if (!playlist.includes('#EXTM3U')) return playlist;
+
+  const normalized = playlist.replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
+  const hasDiscontinuity = lines.some((line) => line.trim() === '#EXT-X-DISCONTINUITY');
+  let playlistDuration = 0;
+  let segmentCount = 0;
+  let hasEndList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const extinf = trimmed.match(/^#EXTINF:([\d.]+)/);
+    if (extinf) {
+      playlistDuration += Number(extinf[1]) || 0;
+      segmentCount += 1;
+    } else if (trimmed === '#EXT-X-ENDLIST') {
+      hasEndList = true;
+    }
+  }
+
+  const keepEndList =
+    hasEndList &&
+    expectedDuration > 0 &&
+    playlistDuration >= Math.max(expectedDuration - 1, expectedDuration * 0.98);
+
+  let mediaIndex = 0;
+  const rewritten: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === '#EXT-X-ENDLIST' && !keepEndList) {
+      continue;
+    }
+
+    if (trimmed.startsWith('#EXT-X-PLAYLIST-TYPE:VOD') && !keepEndList) {
+      rewritten.push('#EXT-X-PLAYLIST-TYPE:EVENT');
+      continue;
+    }
+
+    if (!hasDiscontinuity && trimmed.startsWith('#EXTINF:')) {
+      if (mediaIndex > 0) rewritten.push('#EXT-X-DISCONTINUITY');
+      mediaIndex += 1;
+    }
+
+    rewritten.push(line);
+  }
+
+  return segmentCount > 1 || !keepEndList ? rewritten.join('\n') : playlist;
+}
+
+function createTranscodePlaylistLoader(expectedDuration: number) {
+  return class TranscodePlaylistLoader implements Loader<PlaylistLoaderContext> {
+    private loader: XhrLoader;
+    public context: PlaylistLoaderContext | null = null;
+    public stats: LoaderStats;
+
+    constructor(config: HlsConfig) {
+      this.loader = new XhrLoader(config);
+      this.stats = this.loader.stats;
+    }
+
+    destroy() {
+      this.loader.destroy();
+      this.context = null;
+    }
+
+    abort() {
+      this.loader.abort();
+    }
+
+    load(
+      context: PlaylistLoaderContext,
+      config: LoaderConfiguration,
+      callbacks: LoaderCallbacks<PlaylistLoaderContext>,
+    ) {
+      this.context = context;
+      const rewrite = isTranscodePlaylistUrl(context.url);
+      const loaderContext: LoaderContext = rewrite
+        ? { ...context, url: withCacheBust(context.url) }
+        : context;
+
+      const wrappedCallbacks: LoaderCallbacks<LoaderContext> = {
+        onSuccess: (response, stats, _context, networkDetails) => {
+          const data = typeof response.data === 'string' && rewrite
+            ? rewriteTranscodePlaylist(response.data, expectedDuration)
+            : response.data;
+
+          callbacks.onSuccess(
+            { ...response, url: context.url, data },
+            stats,
+            context,
+            networkDetails,
+          );
+        },
+        onError: (error, _context, networkDetails, stats) => {
+          callbacks.onError(error, context, networkDetails, stats);
+        },
+        onTimeout: (stats, _context, networkDetails) => {
+          callbacks.onTimeout(stats, context, networkDetails);
+        },
+        onAbort: (stats, _context, networkDetails) => {
+          callbacks.onAbort?.(stats, context, networkDetails);
+        },
+        onProgress: (stats, _context, data, networkDetails) => {
+          callbacks.onProgress?.(stats, context, data, networkDetails);
+        },
+      };
+
+      this.loader.load(loaderContext, config, wrappedCallbacks);
+    }
+
+    getCacheAge() {
+      return this.loader.getCacheAge?.() ?? null;
+    }
+
+    getResponseHeader(name: string) {
+      return this.loader.getResponseHeader?.(name) ?? null;
+    }
+  };
 }
 
 // 트랜스코딩이 필요할 때 쓰는 전송 방식.
@@ -192,13 +333,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   }, [fileId, initialFile]);
 
   // HLS 모드에서 hls.js(MSE)를 사용할지 여부.
-  // Safari/iOS처럼 네이티브 HLS가 있는 환경은 <video>가 직접 재생하고,
-  // Chrome/Firefox처럼 네이티브 HLS가 없는 환경은 hls.js가 MSE로 재생합니다.
-  const useHlsJs =
-    useTranscode &&
-    TRANSCODE_METHOD === 'hls' &&
-    !canPlayNativeHls() &&
-    canPlayManagedHls();
+  // Safari 네이티브 HLS는 manifest를 그대로 해석하므로, hls.js가 가능한 Safari에서는
+  // Chrome과 같은 playlist 보정 경로를 태웁니다. hls.js가 불가능한 iOS/구형 Safari만 네이티브 HLS로 폴백합니다.
+  const useHlsJs = useTranscode && TRANSCODE_METHOD === 'hls' && canPlayManagedHls();
+  const fileDuration = normalizeDuration(file?.duration);
 
   const videoSrc = (fileId != null && file != null)
     ? (useTranscode
@@ -226,6 +364,8 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       // MSE 기반 hls.js로 재생
       const hls = new Hls({
         xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = true; },
+        liveDurationInfinity: true,
+        pLoader: createTranscodePlaylistLoader(fileDuration),
         // 세그먼트 로딩 안정성 향상
         fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 1000,
@@ -284,7 +424,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         hlsRef.current = null;
       }
     };
-  }, [streamStart, useHlsJs, videoSrc]);
+  }, [fileDuration, streamStart, useHlsJs, videoSrc]);
 
   function handleTimeUpdate() {
     const v = videoRef.current;
@@ -321,6 +461,30 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (!v) return;
     if (playing) v.pause(); else v.play();
     setPlaying(!playing);
+  }
+
+  function handleEnded() {
+    const v = videoRef.current;
+    const endedBeforeKnownDuration =
+      useTranscode &&
+      TRANSCODE_METHOD === 'hls' &&
+      duration > 0 &&
+      (v?.currentTime || currentTime) < duration - 1;
+
+    if (endedBeforeKnownDuration) {
+      setPlaying(true);
+      setWaiting(true);
+      hlsRef.current?.startLoad(v?.currentTime ?? -1);
+      v?.play().catch((err) => {
+        console.warn('Autoplay blocked or failed:', err);
+        setPlaying(false);
+        setWaiting(false);
+      });
+      return;
+    }
+
+    setPlaying(false);
+    setWaiting(false);
   }
 
   // 사용자가 재생 방식(일반 재생 / 실시간 트랜스코딩)을 직접 고르는 핸들러.
@@ -395,10 +559,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
               setPlaying(false);
               setWaiting(false);
             }}
-            onEnded={() => {
-              setPlaying(false);
-              setWaiting(false);
-            }}
+            onEnded={handleEnded}
             onWaiting={() => {
               const v = videoRef.current;
               setWaiting(!v || v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
