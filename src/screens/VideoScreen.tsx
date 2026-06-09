@@ -1,5 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
-import Hls from 'hls.js';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import Hls, { XhrLoader } from 'hls.js';
+import type {
+  HlsConfig,
+  Loader,
+  LoaderCallbacks,
+  LoaderConfiguration,
+  LoaderContext,
+  LoaderStats,
+  PlaylistLoaderContext,
+} from 'hls.js';
 import { Icon } from '../components/Icon';
 import { getFile, getFileStreamUrl, getFileHlsUrl, getFileContentUrl, formatBytes } from '../api/files';
 import type { FileResponseDto } from '../types';
@@ -18,6 +27,11 @@ function formatTime(secs: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function normalizeDuration(duration?: number | null): number {
+  if (!duration) return 0;
+  return duration > 50000 ? duration / 1000 : duration;
+}
+
 // 사파리/iOS(아이폰·아이패드)는 모든 브라우저가 WebKit이라 <video>에 Range(206)를 강하게 요구합니다.
 // 이런 환경에서는 라이브 트랜스코딩(/stream: 200 응답, Range 미지원)이 재생되지 않으므로,
 // 사파리가 네이티브로 디코딩 가능한 코덱/컨테이너는 /content(원본 + Range)로 직접 재생시킵니다.
@@ -33,10 +47,157 @@ function isAppleWebKit(): boolean {
 
 const APPLE_WEBKIT = isAppleWebKit();
 
+function canPlayNativeHls(): boolean {
+  if (typeof document === 'undefined') return false;
+  const video = document.createElement('video');
+  return (
+    video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
+    video.canPlayType('application/x-mpegURL') !== ''
+  );
+}
+
+function canPlayManagedHls(): boolean {
+  return typeof window !== 'undefined' && Hls.isSupported();
+}
+
+function isTranscodePlaylistUrl(url: string): boolean {
+  return /\/stream\/index\.m3u8(?:[?#]|$)/.test(url);
+}
+
+function withCacheBust(url: string): string {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}_hls_reload=${Date.now()}`;
+}
+
+function rewriteTranscodePlaylist(playlist: string, expectedDuration: number): string {
+  if (!playlist.includes('#EXTM3U')) return playlist;
+
+  const normalized = playlist.replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
+  const hasDiscontinuity = lines.some((line) => line.trim() === '#EXT-X-DISCONTINUITY');
+  let playlistDuration = 0;
+  let segmentCount = 0;
+  let hasEndList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const extinf = trimmed.match(/^#EXTINF:([\d.]+)/);
+    if (extinf) {
+      playlistDuration += Number(extinf[1]) || 0;
+      segmentCount += 1;
+    } else if (trimmed === '#EXT-X-ENDLIST') {
+      hasEndList = true;
+    }
+  }
+
+  const keepEndList =
+    hasEndList &&
+    expectedDuration > 0 &&
+    playlistDuration >= Math.max(expectedDuration - 1, expectedDuration * 0.98);
+
+  let mediaIndex = 0;
+  const rewritten: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === '#EXT-X-ENDLIST' && !keepEndList) {
+      continue;
+    }
+
+    if (trimmed.startsWith('#EXT-X-PLAYLIST-TYPE:VOD') && !keepEndList) {
+      rewritten.push('#EXT-X-PLAYLIST-TYPE:EVENT');
+      continue;
+    }
+
+    if (!hasDiscontinuity && trimmed.startsWith('#EXTINF:')) {
+      if (mediaIndex > 0) rewritten.push('#EXT-X-DISCONTINUITY');
+      mediaIndex += 1;
+    }
+
+    rewritten.push(line);
+  }
+
+  return segmentCount > 1 || !keepEndList ? rewritten.join('\n') : playlist;
+}
+
+function createTranscodePlaylistLoader(expectedDuration: number) {
+  return class TranscodePlaylistLoader implements Loader<PlaylistLoaderContext> {
+    private loader: XhrLoader;
+    public context: PlaylistLoaderContext | null = null;
+    public stats: LoaderStats;
+
+    constructor(config: HlsConfig) {
+      this.loader = new XhrLoader(config);
+      this.stats = this.loader.stats;
+    }
+
+    destroy() {
+      this.loader.destroy();
+      this.context = null;
+    }
+
+    abort() {
+      this.loader.abort();
+    }
+
+    load(
+      context: PlaylistLoaderContext,
+      config: LoaderConfiguration,
+      callbacks: LoaderCallbacks<PlaylistLoaderContext>,
+    ) {
+      this.context = context;
+      const rewrite = isTranscodePlaylistUrl(context.url);
+      const loaderContext: LoaderContext = rewrite
+        ? { ...context, url: withCacheBust(context.url) }
+        : context;
+
+      const wrappedCallbacks: LoaderCallbacks<LoaderContext> = {
+        onSuccess: (response, stats, _context, networkDetails) => {
+          const data = typeof response.data === 'string' && rewrite
+            ? rewriteTranscodePlaylist(response.data, expectedDuration)
+            : response.data;
+
+          callbacks.onSuccess(
+            { ...response, url: context.url, data },
+            stats,
+            context,
+            networkDetails,
+          );
+        },
+        onError: (error, _context, networkDetails, stats) => {
+          callbacks.onError(error, context, networkDetails, stats);
+        },
+        onTimeout: (stats, _context, networkDetails) => {
+          callbacks.onTimeout(stats, context, networkDetails);
+        },
+        onAbort: (stats, _context, networkDetails) => {
+          callbacks.onAbort?.(stats, context, networkDetails);
+        },
+        onProgress: (stats, _context, data, networkDetails) => {
+          callbacks.onProgress?.(stats, context, data, networkDetails);
+        },
+      };
+
+      this.loader.load(loaderContext, config, wrappedCallbacks);
+    }
+
+    getCacheAge() {
+      return this.loader.getCacheAge?.() ?? null;
+    }
+
+    getResponseHeader(name: string) {
+      return this.loader.getResponseHeader?.(name) ?? null;
+    }
+  };
+}
+
 // 트랜스코딩이 필요할 때 쓰는 전송 방식.
-// 사파리/iOS는 progressive /stream(Range 미지원)을 못 틀기 때문에 HLS(네이티브 지원)로,
-// 그 외 브라우저는 HLS 네이티브 지원이 없으므로 기존 progressive /stream으로 보냅니다.
-const TRANSCODE_METHOD: 'hls' | 'stream' = APPLE_WEBKIT ? 'hls' : 'stream';
+// progressive /stream은 서버가 데이터를 내려줘도 브라우저가 재생 가능한 초기 MP4/Range 조건을
+// 만족하지 못하면 무한 버퍼링에 빠질 수 있습니다. HLS를 지원하는 환경은 HLS를 우선 사용하고,
+// HLS가 불가능한 구형 브라우저에서만 기존 progressive /stream으로 폴백합니다.
+const TRANSCODE_METHOD: 'hls' | 'stream' =
+  APPLE_WEBKIT || canPlayManagedHls() || canPlayNativeHls() ? 'hls' : 'stream';
 
 const H264_CODECS = ['h264', 'avc', 'avc1'];
 const HEVC_CODECS = ['hevc', 'h265', 'hvc1', 'hev1'];
@@ -65,7 +226,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [_volume, setVolume] = useState(1);
+  const [, setVolume] = useState(1);
   // autoStream: 파일/브라우저 기준 자동 판별값. forcedMode: 사용자가 수동으로 고른 재생 방식(없으면 자동).
   const [autoStream, setAutoStream] = useState(false);
   const [forcedMode, setForcedMode] = useState<'content' | 'stream' | null>(null);
@@ -77,7 +238,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [userActive, setUserActive] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeTimeoutRef = useRef<any>(null);
+  const activeTimeoutRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -88,6 +249,17 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   // progressive /stream만 시킹 시 URL을 갈아끼워 재로딩이 필요합니다.
   // HLS와 /content는 전체 구간이 있어 네이티브 시킹(v.currentTime)이 됩니다.
   const reloadSeek = useTranscode && TRANSCODE_METHOD === 'stream';
+
+  const handleMouseMove = useCallback(() => {
+    setUserActive(true);
+    if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
+
+    if (playing) {
+      activeTimeoutRef.current = window.setTimeout(() => {
+        setUserActive(false);
+      }, 3000);
+    }
+  }, [playing]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -110,18 +282,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     } else {
       handleMouseMove();
     }
-  }, [playing]);
-
-  function handleMouseMove() {
-    setUserActive(true);
-    if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
-    
-    if (playing) {
-      activeTimeoutRef.current = window.setTimeout(() => {
-        setUserActive(false);
-      }, 3000);
-    }
-  }
+  }, [handleMouseMove, playing]);
 
   function toggleFullscreen() {
     const el = containerRef.current;
@@ -152,13 +313,11 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
     const configureFile = (f: FileResponseDto) => {
       // 원본을 네이티브로 재생 가능하면 /content(Range 바이트 서빙)로 직접 재생하고,
-      // 불가능하면 실시간 트랜스코딩으로 전송합니다. 트랜스코딩 전송 방식은 브라우저별로 달라서
-      // (TRANSCODE_METHOD) 사파리/iOS는 HLS, 그 외는 progressive /stream을 씁니다.
+      // 불가능하면 실시간 트랜스코딩으로 전송합니다. 트랜스코딩은 가능한 경우 HLS를 우선 사용합니다.
       setAutoStream(!canPlayNativeFile(f.extension, f.videoCodec));
 
       if (f.duration) {
-        const secs = f.duration > 50000 ? f.duration / 1000 : f.duration;
-        setDuration(secs);
+        setDuration(normalizeDuration(f.duration));
       }
     };
 
@@ -173,8 +332,11 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     }
   }, [fileId, initialFile]);
 
-  // HLS 모드에서 hls.js(MSE)를 사용할지 여부
-  const useHlsJs = useTranscode && TRANSCODE_METHOD === 'hls' && Hls.isSupported();
+  // HLS 모드에서 hls.js(MSE)를 사용할지 여부.
+  // Safari 네이티브 HLS는 manifest를 그대로 해석하므로, hls.js가 가능한 Safari에서는
+  // Chrome과 같은 playlist 보정 경로를 태웁니다. hls.js가 불가능한 iOS/구형 Safari만 네이티브 HLS로 폴백합니다.
+  const useHlsJs = useTranscode && TRANSCODE_METHOD === 'hls' && canPlayManagedHls();
+  const fileDuration = normalizeDuration(file?.duration);
 
   const videoSrc = (fileId != null && file != null)
     ? (useTranscode
@@ -196,17 +358,25 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     }
 
     if (useHlsJs) {
-      // MSE 기반 hls.js로 재생 (사파리 네이티브 HLS 엔진 우회)
+      v.removeAttribute('src');
+      v.load();
+
+      // MSE 기반 hls.js로 재생
       const hls = new Hls({
         xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = true; },
+        liveDurationInfinity: true,
+        pLoader: createTranscodePlaylistLoader(fileDuration),
         // 세그먼트 로딩 안정성 향상
         fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 1000,
         manifestLoadingMaxRetry: 4,
         levelLoadingMaxRetry: 4,
+        startPosition: Math.max(resumeAtRef.current ?? streamStart, 0),
       });
-      hls.loadSource(videoSrc);
-      hls.attachMedia(v);
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        if (destroyed) return;
+        hls.loadSource(videoSrc);
+      });
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (destroyed) return;
         v.play().catch((err) => {
@@ -236,11 +406,14 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         }
       });
       hlsRef.current = hls;
+      hls.attachMedia(v);
     } else {
       // 네이티브 재생 (progressive /stream, /content, 또는 iOS 네이티브 HLS)
+      v.load();
       v.play().catch((err) => {
         console.warn('Autoplay blocked or failed:', err);
         setPlaying(false);
+        setWaiting(false);
       });
     }
 
@@ -251,13 +424,20 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         hlsRef.current = null;
       }
     };
-  }, [videoSrc]);
+  }, [fileDuration, streamStart, useHlsJs, videoSrc]);
 
   function handleTimeUpdate() {
     const v = videoRef.current;
     if (!v) return;
     setCurrentTime(streamStart + v.currentTime);
     if (v.buffered.length > 0) setBuffered(streamStart + v.buffered.end(v.buffered.length - 1));
+    if (v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) setWaiting(false);
+  }
+
+  function clearWaitingIfReady() {
+    const v = videoRef.current;
+    if (!v || v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    setWaiting(false);
   }
 
   function handleSeek(e: React.MouseEvent<HTMLDivElement>) {
@@ -283,11 +463,37 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     setPlaying(!playing);
   }
 
+  function handleEnded() {
+    const v = videoRef.current;
+    const endedBeforeKnownDuration =
+      useTranscode &&
+      TRANSCODE_METHOD === 'hls' &&
+      duration > 0 &&
+      (v?.currentTime || currentTime) < duration - 1;
+
+    if (endedBeforeKnownDuration) {
+      setPlaying(true);
+      setWaiting(true);
+      hlsRef.current?.startLoad(v?.currentTime ?? -1);
+      v?.play().catch((err) => {
+        console.warn('Autoplay blocked or failed:', err);
+        setPlaying(false);
+        setWaiting(false);
+      });
+      return;
+    }
+
+    setPlaying(false);
+    setWaiting(false);
+  }
+
   // 사용자가 재생 방식(일반 재생 / 실시간 트랜스코딩)을 직접 고르는 핸들러.
   // 현재 재생 위치를 유지한 채 방식만 전환합니다.
   function selectMode(mode: 'content' | 'stream') {
     setShowSettings(false);
     if (useTranscode === (mode === 'stream')) return; // 이미 같은 방식이면 무시
+    setError(null);
+    setWaiting(true);
     const t = currentTime;
     if (mode === 'stream' && TRANSCODE_METHOD === 'stream') {
       // progressive 트랜스코딩: 현재 위치부터 변환 시작 (URL 재로딩)
@@ -340,29 +546,32 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             onLoadedMetadata={() => {
               const v = videoRef.current;
               if (!v) return;
-              if (!duration) setDuration(v.duration || 0);
+              if (!duration && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
               // 재생 방식 전환 시 직전 위치로 복원 (일반 재생 경로)
               if (resumeAtRef.current != null) {
-                try { v.currentTime = resumeAtRef.current; } catch {}
+                try { v.currentTime = resumeAtRef.current; } catch { /* ignore invalid resume seek */ }
                 resumeAtRef.current = null;
               }
+              clearWaitingIfReady();
             }}
             onPlay={() => setPlaying(true)}
             onPause={() => {
               setPlaying(false);
               setWaiting(false);
             }}
-            onEnded={() => {
-              setPlaying(false);
-              setWaiting(false);
+            onEnded={handleEnded}
+            onWaiting={() => {
+              const v = videoRef.current;
+              setWaiting(!v || v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
             }}
-            onWaiting={() => setWaiting(true)}
             onPlaying={() => setWaiting(false)}
             onSeeking={() => setWaiting(true)}
             onSeeked={() => setWaiting(false)}
             onCanPlay={() => setWaiting(false)}
+            onCanPlayThrough={() => setWaiting(false)}
             onLoadStart={() => setWaiting(true)}
             onLoadedData={() => setWaiting(false)}
+            onProgress={clearWaitingIfReady}
             onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
             onError={() => {
               const mediaError = videoRef.current?.error;
@@ -429,7 +638,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             <div className="t">{file.baseName}</div>
             <div className="s">
               {file.width && file.height ? `${file.width}×${file.height} · ` : ''}
-              {file.duration ? `${formatTime(file.duration > 50000 ? file.duration / 1000 : file.duration)} · ` : ''}
+              {file.duration ? `${formatTime(normalizeDuration(file.duration))} · ` : ''}
               {file.videoCodec || ''}
               {file.size ? ` · ${formatBytes(file.size)}` : ''}
             </div>
