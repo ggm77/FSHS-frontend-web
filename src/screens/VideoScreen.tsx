@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import Hls from 'hls.js';
 import { Icon } from '../components/Icon';
 import { getFile, getFileStreamUrl, getFileHlsUrl, getFileContentUrl, formatBytes } from '../api/files';
 import type { FileResponseDto } from '../types';
@@ -78,6 +79,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeTimeoutRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const resumeAtRef = useRef<number | null>(null);
 
@@ -171,21 +173,84 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     }
   }, [fileId, initialFile]);
 
+  // HLS 모드에서 hls.js(MSE)를 사용할지 여부
+  const useHlsJs = useTranscode && TRANSCODE_METHOD === 'hls' && Hls.isSupported();
+
   const videoSrc = (fileId != null && file != null)
     ? (useTranscode
         ? (TRANSCODE_METHOD === 'hls' ? getFileHlsUrl(fileId) : getFileStreamUrl(fileId, streamStart))
         : getFileContentUrl(fileId, false))
     : '';
 
+  // hls.js 또는 네이티브 소스 로드
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !videoSrc) return;
-    if (playing) {
+
+    let destroyed = false;
+
+    // 이전 hls.js 인스턴스 정리
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (useHlsJs) {
+      // MSE 기반 hls.js로 재생 (사파리 네이티브 HLS 엔진 우회)
+      const hls = new Hls({
+        xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = true; },
+        // 세그먼트 로딩 안정성 향상
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+      });
+      hls.loadSource(videoSrc);
+      hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (destroyed) return;
+        v.play().catch((err) => {
+          console.warn('Autoplay blocked or failed:', err);
+          setPlaying(false);
+        });
+      });
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (destroyed) return;
+        console.warn('hls.js error:', data.type, data.details, 'fatal:', data.fatal);
+        if (data.fatal) {
+          // 치명적 에러 발생 시 자동 복구 시도
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn('hls.js: 네트워크 에러 → 복구 시도');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn('hls.js: 미디어 에러 → recoverMediaError 시도');
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error('hls.js: 복구 불가 에러');
+              setError(`HLS 재생 오류: ${data.details}`);
+              break;
+          }
+        }
+      });
+      hlsRef.current = hls;
+    } else {
+      // 네이티브 재생 (progressive /stream, /content, 또는 iOS 네이티브 HLS)
       v.play().catch((err) => {
         console.warn('Autoplay blocked or failed:', err);
         setPlaying(false);
       });
     }
+
+    return () => {
+      destroyed = true;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
   }, [videoSrc]);
 
   function handleTimeUpdate() {
@@ -266,8 +331,8 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       <div className="video-stage">
         {videoSrc ? (
           <video
-            key={videoSrc}
             ref={videoRef}
+            src={useHlsJs ? undefined : videoSrc}
             playsInline
             preload="auto"
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
@@ -309,14 +374,18 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
               }
             }}
           >
-            <source
-              src={videoSrc}
-              type={
-                useTranscode
-                  ? (TRANSCODE_METHOD === 'hls' ? 'application/vnd.apple.mpegurl' : 'video/mp4')
-                  : (file?.mimeType || 'video/mp4')
-              }
-            />
+            {/* hls.js 사용 시 src는 hls.js가 관리하므로 source 태그 불필요 */}
+            {/* iOS 등 네이티브 HLS 폴백 시에만 source 태그 사용 */}
+            {!useHlsJs && !videoSrc ? null : !useHlsJs && (
+              <source
+                src={videoSrc}
+                type={
+                  useTranscode
+                    ? (TRANSCODE_METHOD === 'hls' ? 'application/vnd.apple.mpegurl' : 'video/mp4')
+                    : (file?.mimeType || 'video/mp4')
+                }
+              />
+            )}
           </video>
         ) : (
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
