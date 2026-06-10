@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent } from '../api/files';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
+import type { DownloadProgress } from '../api/download';
 
 interface Props {
   rootFolderId: number | null;
@@ -64,6 +65,13 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     onConfirm: () => void | Promise<void>;
   }
 
+  interface DownloadState {
+    key: string;
+    name: string;
+    loadedBytes: number;
+    totalBytes: number | null;
+  }
+
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [movingItem, setMovingItem] = useState<{ type: 'file' | 'folder'; id: number; name: string } | null>(null);
@@ -71,11 +79,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
-  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const [downloadState, setDownloadState] = useState<DownloadState | null>(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
+  const downloadingKey = downloadState?.key ?? null;
 
   useEffect(() => {
     if (rootFolderId == null) return;
@@ -278,27 +287,38 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     setMovingItem({ type, id, name });
   }
 
-  async function runDownload(key: string, task: () => Promise<void>) {
-    if (downloadingKey) return;
+  async function runDownload(
+    key: string,
+    name: string,
+    task: (onProgress: (progress: DownloadProgress) => void) => Promise<void>,
+  ) {
+    if (downloadState) return;
     setError('');
-    setDownloadingKey(key);
+    setDownloadState({ key, name, loadedBytes: 0, totalBytes: null });
     try {
-      await task();
+      await task((progress) => {
+        setDownloadState(prev => prev?.key === key ? {
+          ...prev,
+          loadedBytes: progress.loadedBytes,
+          totalBytes: progress.totalBytes,
+        } : prev);
+      });
     } catch (err: unknown) {
       setError(getErrorMessage(err, '다운로드에 실패했습니다.'));
     } finally {
-      setDownloadingKey(null);
+      setDownloadState(null);
     }
   }
 
   function handleDownloadFolder(folder: SimpleFolderResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
-    runDownload(`folder-${folder.id}`, () => downloadFolderContent(folder.id, `${folder.name}.zip`));
+    const filename = `${folder.name}.zip`;
+    runDownload(`folder-${folder.id}`, filename, onProgress => downloadFolderContent(folder.id, filename, onProgress));
   }
 
   function handleDownloadFile(file: FileResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
-    runDownload(`file-${file.id}`, () => downloadFileContent(file.id, file.name));
+    runDownload(`file-${file.id}`, file.name, onProgress => downloadFileContent(file.id, file.name, onProgress));
   }
 
   async function handleConfirmMove() {
@@ -590,6 +610,42 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         </div>
       )}
 
+      {downloadState && (
+        <div className="upload-status-widget download-status-widget" style={{ bottom: showUploadStatus ? 360 : 24 }}>
+          <div className="widget-header">
+            <span className="title">
+              <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
+              파일 다운로드 중
+            </span>
+          </div>
+          <div className="widget-body">
+            <div className="file-info-row">
+              <span className="file-name-txt" title={downloadState.name}>{downloadState.name}</span>
+              <span className="pct-txt">
+                {downloadState.totalBytes
+                  ? `${Math.min(100, Math.floor((downloadState.loadedBytes / downloadState.totalBytes) * 100))}%`
+                  : formatBytes(downloadState.loadedBytes)}
+              </span>
+            </div>
+            <div className="widget-progress-bg">
+              <div
+                className={`widget-progress-fill ${downloadState.totalBytes ? '' : 'processing'}`}
+                style={{
+                  width: downloadState.totalBytes
+                    ? `${Math.min(100, (downloadState.loadedBytes / downloadState.totalBytes) * 100)}%`
+                    : '100%',
+                }}
+              />
+            </div>
+            <div className="download-byte-row">
+              {downloadState.totalBytes
+                ? `${formatBytes(downloadState.loadedBytes)} / ${formatBytes(downloadState.totalBytes)}`
+                : `${formatBytes(downloadState.loadedBytes)} 받는 중`}
+            </div>
+          </div>
+        </div>
+      )}
+
       {movingItem && (
         <div className="move-banner">
           <div className="banner-content">
@@ -773,6 +829,13 @@ const filesStyles = `
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     flex-shrink: 0;
+  }
+
+  .download-status-widget .download-byte-row {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.62);
+    font-variant-numeric: tabular-nums;
   }
 
   .upload-status-widget .widget-progress-bg {

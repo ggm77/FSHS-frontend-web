@@ -1,5 +1,5 @@
 import { request, getCookie } from './client';
-import { downloadUrl } from './download';
+import { downloadUrl, type DownloadProgress } from './download';
 import type { FileResponseDto, FileStatusDto } from '../types';
 
 export function getFile(fileId: number): Promise<FileResponseDto> {
@@ -64,8 +64,12 @@ export function getFileContentUrl(fileId: number, download: boolean): string {
   return `/api/v2/files/${fileId}/content?download=${download}`;
 }
 
-export function downloadFileContent(fileId: number, filename: string): Promise<void> {
-  return downloadUrl(getFileContentUrl(fileId, true), filename);
+export function downloadFileContent(
+  fileId: number,
+  filename: string,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<void> {
+  return downloadUrl(getFileContentUrl(fileId, true), filename, { onProgress });
 }
 
 export function getFileStreamUrl(fileId: number, start = 0): string {

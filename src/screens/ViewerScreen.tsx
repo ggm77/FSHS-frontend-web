@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Icon } from '../components/Icon';
 import { getFile, getFileContentUrl, formatBytes, downloadFileContent } from '../api/files';
 import type { FileResponseDto } from '../types';
+import type { DownloadProgress } from '../api/download';
 
 interface Props {
   fileId: number | null;
@@ -16,6 +17,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState('');
 
   useEffect(() => {
@@ -38,15 +40,21 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   async function handleDownload() {
     if (!file || downloading) return;
     setDownloadError('');
+    setDownloadProgress({ loadedBytes: 0, totalBytes: null });
     setDownloading(true);
     try {
-      await downloadFileContent(file.id, file.name);
+      await downloadFileContent(file.id, file.name, progress => setDownloadProgress(progress));
     } catch (err: unknown) {
       setDownloadError(getErrorMessage(err, '다운로드에 실패했습니다.'));
     } finally {
       setDownloading(false);
+      setDownloadProgress(null);
     }
   }
+
+  const downloadPercent = downloadProgress?.totalBytes
+    ? Math.min(100, (downloadProgress.loadedBytes / downloadProgress.totalBytes) * 100)
+    : null;
 
   return (
     <div className="viewer-page">
@@ -71,6 +79,25 @@ export function ViewerScreen({ fileId, onBack }: Props) {
 
       <div className="viewer-body">
         {downloadError && <div className="viewer-download-error">{downloadError}</div>}
+        {downloading && downloadProgress && (
+          <div className="viewer-download-progress">
+            <div className="progress-top">
+              <span>{file?.name || '파일'}</span>
+              <strong>{downloadPercent == null ? formatBytes(downloadProgress.loadedBytes) : `${Math.floor(downloadPercent)}%`}</strong>
+            </div>
+            <div className="progress-track">
+              <div
+                className={downloadPercent == null ? 'progress-fill indeterminate' : 'progress-fill'}
+                style={{ width: downloadPercent == null ? '100%' : `${downloadPercent}%` }}
+              />
+            </div>
+            <div className="progress-bytes">
+              {downloadProgress.totalBytes
+                ? `${formatBytes(downloadProgress.loadedBytes)} / ${formatBytes(downloadProgress.totalBytes)}`
+                : `${formatBytes(downloadProgress.loadedBytes)} 받는 중`}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="viewer-loader">
             <Icon name="spinner" size={28} />
@@ -200,6 +227,62 @@ const viewerStyles = `
     background: rgba(239, 68, 68, 0.18);
     color: #fecaca;
     font-size: 13px;
+  }
+  .viewer-download-progress {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: min(420px, calc(100% - 32px));
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(22, 24, 34, 0.94);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .viewer-download-progress .progress-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+    color: #fff;
+  }
+  .viewer-download-progress .progress-top span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .viewer-download-progress .progress-top strong,
+  .viewer-download-progress .progress-bytes {
+    font-variant-numeric: tabular-nums;
+  }
+  .viewer-download-progress .progress-track {
+    height: 6px;
+    margin-top: 9px;
+    border-radius: 99px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .viewer-download-progress .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: var(--accent, #5b50e8);
+    transition: width 0.15s ease-out;
+  }
+  .viewer-download-progress .progress-fill.indeterminate {
+    animation: pulse 1.5s infinite;
+  }
+  .viewer-download-progress .progress-bytes {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: #aaa;
+  }
+  @keyframes pulse {
+    0% { opacity: 0.45; }
+    50% { opacity: 1; }
+    100% { opacity: 0.45; }
   }
   .viewer-loader {
     display: flex;
