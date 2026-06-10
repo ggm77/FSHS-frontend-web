@@ -47,17 +47,189 @@ function isAppleWebKit(): boolean {
 
 const APPLE_WEBKIT = isAppleWebKit();
 
-function canPlayNativeHls(): boolean {
+function canPlayMediaType(mediaType: string): boolean {
   if (typeof document === 'undefined') return false;
   const video = document.createElement('video');
+  return video.canPlayType(mediaType) !== '';
+}
+
+function canPlayNativeHls(): boolean {
   return (
-    video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
-    video.canPlayType('application/x-mpegURL') !== ''
+    canPlayMediaType('application/vnd.apple.mpegurl') ||
+    canPlayMediaType('application/x-mpegURL')
   );
 }
 
 function canPlayManagedHls(): boolean {
   return typeof window !== 'undefined' && Hls.isSupported();
+}
+
+const H264_CODECS = ['h264', 'h.264', 'avc', 'avc1'];
+const HEVC_CODECS = ['hevc', 'h265', 'h.265', 'hvc1', 'hev1'];
+
+function getVideoMimeTypes(extension?: string | null, mimeType?: string | null): string[] {
+  const mediaTypes: string[] = [];
+  const addType = (type: string) => {
+    if (!mediaTypes.includes(type)) mediaTypes.push(type);
+  };
+
+  const mime = (mimeType || '').toLowerCase();
+  if (mime.startsWith('video/')) addType(mime);
+
+  switch ((extension || '').toLowerCase()) {
+    case 'mp4':
+    case 'm4v':
+      addType('video/mp4');
+      break;
+    case 'mov':
+      addType('video/quicktime');
+      addType('video/mp4');
+      break;
+    case 'webm':
+      addType('video/webm');
+      break;
+    case 'mkv':
+      addType('video/x-matroska');
+      break;
+    default:
+      break;
+  }
+
+  return mediaTypes;
+}
+
+function codecMatches(codec: string | null | undefined, aliases: string[]): boolean {
+  const normalized = (codec || '').toLowerCase();
+  return aliases.some((alias) => normalized.includes(alias));
+}
+
+function isHevcCodec(codec?: string | null): boolean {
+  return codecMatches(codec, HEVC_CODECS);
+}
+
+function getVideoCodecCandidates(codec?: string | null): string[] {
+  const normalized = (codec || '').toLowerCase();
+  if (codecMatches(normalized, H264_CODECS)) {
+    return ['avc1.42E01E', 'avc1.4D401E', 'avc1.640028', 'avc1'];
+  }
+  if (codecMatches(normalized, HEVC_CODECS)) {
+    return [
+      'hvc1.1.6.L93.B0',
+      'hvc1.1.6.L120.B0',
+      'hvc1.2.4.L120.B0',
+      'hvc1.2.4.L123.B0',
+      'hev1.1.6.L93.B0',
+      'hev1.2.4.L120.B0',
+      'hvc1',
+      'hev1',
+    ];
+  }
+  if (normalized === 'vp8') return ['vp8'];
+  if (normalized === 'vp9') return ['vp09.00.10.08', 'vp9'];
+  if (normalized === 'av1') return ['av01.0.05M.08', 'av1'];
+  return [];
+}
+
+function getAudioCodecCandidates(codec?: string | null): string[] {
+  const normalized = (codec || '').toLowerCase();
+  if (['aac', 'mp4a'].includes(normalized)) return ['mp4a.40.2'];
+  if (['mp3', 'mpeg layer 3'].includes(normalized)) return ['mp3'];
+  if (normalized === 'opus') return ['opus'];
+  if (normalized === 'vorbis') return ['vorbis'];
+  return [];
+}
+
+function getCodecTypes(videoCodecs: string[], audioCodecs: string[]): string[] {
+  const codecTypes: string[] = [];
+
+  for (const video of videoCodecs) {
+    codecTypes.push(audioCodecs.length > 0 ? `${video}, ${audioCodecs[0]}` : video);
+    codecTypes.push(video);
+  }
+
+  return Array.from(new Set(codecTypes));
+}
+
+async function canDecodeWithMediaCapabilities(
+  contentTypes: string[],
+  file: FileResponseDto,
+): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.mediaCapabilities?.decodingInfo) {
+    return false;
+  }
+
+  for (const contentType of contentTypes) {
+    try {
+      const info = await navigator.mediaCapabilities.decodingInfo({
+        type: 'file',
+        video: {
+          contentType,
+          width: file.width || 1920,
+          height: file.height || 1080,
+          bitrate: file.bitrate || 5_000_000,
+          framerate: file.fps || 30,
+        },
+      });
+
+      if (info.supported) return true;
+    } catch {
+      // Some browsers reject unknown codec/profile strings. Try the next candidate.
+    }
+  }
+
+  return false;
+}
+
+function isMacChromium(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const isMac = /Macintosh|Mac OS X/.test(ua) || navigator.platform === 'MacIntel';
+  const isChromium = /Chrome|Chromium|Edg/.test(ua) && !/OPR|Firefox/.test(ua);
+  return isMac && isChromium;
+}
+
+function isMp4Family(extension?: string | null, mimeType?: string | null): boolean {
+  const ext = (extension || '').toLowerCase();
+  const mime = (mimeType || '').toLowerCase();
+  return ['mp4', 'm4v', 'mov'].includes(ext) || ['video/mp4', 'video/quicktime'].includes(mime);
+}
+
+function isLikelyMacHevcNativeFile(file: FileResponseDto): boolean {
+  return (
+    isMacChromium() &&
+    isHevcCodec(file.videoCodec) &&
+    isMp4Family(file.extension, file.mimeType) &&
+    canPlayMediaType('video/mp4')
+  );
+}
+
+async function canPlayNativeFile(file: FileResponseDto): Promise<boolean> {
+  const mediaTypes = getVideoMimeTypes(file.extension, file.mimeType);
+  if (mediaTypes.length === 0) return false;
+
+  const videoCodecs = getVideoCodecCandidates(file.videoCodec);
+  const audioCodecs = getAudioCodecCandidates(file.audioCodec);
+  const codecTypes = getCodecTypes(videoCodecs, audioCodecs);
+  const contentTypes = mediaTypes.flatMap((mediaType) =>
+    codecTypes.map((codec) => `${mediaType}; codecs="${codec}"`),
+  );
+
+  if (contentTypes.some(canPlayMediaType)) return true;
+  if (await canDecodeWithMediaCapabilities(contentTypes, file)) return true;
+  if (isLikelyMacHevcNativeFile(file)) return true;
+
+  if (file.videoCodec) return false;
+
+  return mediaTypes.some(canPlayMediaType);
+}
+
+function canPlayTranscodedStream(): boolean {
+  if (APPLE_WEBKIT) return false;
+  return (
+    canPlayMediaType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"') ||
+    canPlayMediaType('video/mp4; codecs="avc1.42E01E"') ||
+    canPlayMediaType('video/mp4')
+  );
 }
 
 function isTranscodePlaylistUrl(url: string): boolean {
@@ -192,33 +364,13 @@ function createTranscodePlaylistLoader(expectedDuration: number) {
   };
 }
 
-// 트랜스코딩이 필요할 때 쓰는 전송 방식.
-// progressive /stream은 서버가 데이터를 내려줘도 브라우저가 재생 가능한 초기 MP4/Range 조건을
-// 만족하지 못하면 무한 버퍼링에 빠질 수 있습니다. HLS를 지원하는 환경은 HLS를 우선 사용하고,
-// HLS가 불가능한 구형 브라우저에서만 기존 progressive /stream으로 폴백합니다.
+// 트랜스코딩이 필요할 때 쓰는 전송 방식. 원본을 브라우저가 네이티브로 재생할 수 있으면
+// /content를 먼저 쓰고, 트랜스코딩이 필요할 때는 Chrome/Edge 등에서 재생 가능한 progressive
+// /stream을 HLS보다 먼저 사용합니다. Apple WebKit은 /stream Range 조건에 민감해서 HLS를 우선합니다.
 const TRANSCODE_METHOD: 'hls' | 'stream' =
-  APPLE_WEBKIT || canPlayManagedHls() || canPlayNativeHls() ? 'hls' : 'stream';
-
-const H264_CODECS = ['h264', 'avc', 'avc1'];
-const HEVC_CODECS = ['hevc', 'h265', 'hvc1', 'hev1'];
-
-// 해당 파일을 현재 브라우저가 트랜스코딩 없이 원본 그대로 재생할 수 있는지 판단합니다.
-function canPlayNativeFile(extension?: string | null, videoCodec?: string | null): boolean {
-  const ext = (extension || '').toLowerCase();
-  const codec = (videoCodec || '').toLowerCase();
-
-  if (APPLE_WEBKIT) {
-    // 사파리/iOS: MP4·MOV 계열 컨테이너 + H.264/HEVC는 네이티브 재생 가능
-    const okContainer = ['mp4', 'm4v', 'mov'].includes(ext);
-    const okCodec = !codec || H264_CODECS.includes(codec) || HEVC_CODECS.includes(codec);
-    return okContainer && okCodec;
-  }
-
-  // 크롬 등: MP4·WebM 컨테이너 + H.264만 네이티브 재생 (그 외는 트랜스코딩)
-  const okContainer = ['mp4', 'webm'].includes(ext);
-  const okCodec = !codec || H264_CODECS.includes(codec);
-  return okContainer && okCodec;
-}
+  canPlayTranscodedStream()
+    ? 'stream'
+    : (APPLE_WEBKIT || canPlayManagedHls() || canPlayNativeHls() ? 'hls' : 'stream');
 
 export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(initialFile || null);
@@ -311,10 +463,15 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   useEffect(() => {
     if (!fileId) return;
 
-    const configureFile = (f: FileResponseDto) => {
+    let cancelled = false;
+
+    const configureFile = async (f: FileResponseDto) => {
       // 원본을 네이티브로 재생 가능하면 /content(Range 바이트 서빙)로 직접 재생하고,
-      // 불가능하면 실시간 트랜스코딩으로 전송합니다. 트랜스코딩은 가능한 경우 HLS를 우선 사용합니다.
-      setAutoStream(!canPlayNativeFile(f.extension, f.videoCodec));
+      // 불가능하면 브라우저가 지원하는 트랜스코딩 전송 방식으로 전송합니다.
+      const nativePlayable = await canPlayNativeFile(f);
+      if (cancelled) return;
+
+      setAutoStream(!nativePlayable);
 
       if (f.duration) {
         setDuration(normalizeDuration(f.duration));
@@ -326,10 +483,15 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       configureFile(initialFile);
     } else {
       getFile(fileId).then(f => {
+        if (cancelled) return;
         setFile(f);
         configureFile(f);
       });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [fileId, initialFile]);
 
   // HLS 모드에서 hls.js(MSE)를 사용할지 여부.
