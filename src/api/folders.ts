@@ -1,4 +1,5 @@
 import { request } from './client';
+import { downloadUrl } from './download';
 import type { FolderResponseDto } from '../types';
 
 export function getFolder(folderId: number): Promise<FolderResponseDto> {
@@ -25,4 +26,8 @@ export async function deleteFolder(folderId: number): Promise<void> {
 
 export function getFolderDownloadUrl(folderId: number): string {
   return `/api/v2/folders/${folderId}/content`;
+}
+
+export function downloadFolderContent(folderId: number, filename: string): Promise<void> {
+  return downloadUrl(getFolderDownloadUrl(folderId), filename);
 }

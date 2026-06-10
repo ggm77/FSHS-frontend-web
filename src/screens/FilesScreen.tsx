@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '../components/Icon';
-import { getFolder, createFolder, deleteFolder, getFolderDownloadUrl, renameFolder } from '../api/folders';
-import { uploadFile, deleteFile, getFileContentUrl, formatBytes, getFileStatus, moveFile } from '../api/files';
+import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
+import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent } from '../api/files';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
 
 interface Props {
@@ -40,6 +40,10 @@ function formatDate(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
 export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<{ id: number; name: string }[]>([]);
@@ -67,6 +71,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,11 +159,11 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         try {
           await deleteFolder(folderId);
           loadFolder(currentFolderId!);
-        } catch (err: any) {
+        } catch (err: unknown) {
           setDialog({
             type: 'alert',
             title: '삭제 실패',
-            message: err.message || '폴더를 삭제하지 못했습니다.',
+            message: getErrorMessage(err, '폴더를 삭제하지 못했습니다.'),
             onConfirm: () => setDialog(null)
           });
           return;
@@ -178,11 +183,11 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         try {
           await deleteFile(fileId);
           loadFolder(currentFolderId!);
-        } catch (err: any) {
+        } catch (err: unknown) {
           setDialog({
             type: 'alert',
             title: '삭제 실패',
-            message: err.message || '파일을 삭제하지 못했습니다.',
+            message: getErrorMessage(err, '파일을 삭제하지 못했습니다.'),
             onConfirm: () => setDialog(null)
           });
           return;
@@ -273,6 +278,29 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     setMovingItem({ type, id, name });
   }
 
+  async function runDownload(key: string, task: () => Promise<void>) {
+    if (downloadingKey) return;
+    setError('');
+    setDownloadingKey(key);
+    try {
+      await task();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '다운로드에 실패했습니다.'));
+    } finally {
+      setDownloadingKey(null);
+    }
+  }
+
+  function handleDownloadFolder(folder: SimpleFolderResponseDto, e: React.MouseEvent) {
+    e.stopPropagation();
+    runDownload(`folder-${folder.id}`, () => downloadFolderContent(folder.id, `${folder.name}.zip`));
+  }
+
+  function handleDownloadFile(file: FileResponseDto, e: React.MouseEvent) {
+    e.stopPropagation();
+    runDownload(`file-${file.id}`, () => downloadFileContent(file.id, file.name));
+  }
+
   async function handleConfirmMove() {
     if (!movingItem || currentFolderId == null) return;
     
@@ -294,11 +322,11 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
       }
       loadFolder(currentFolderId);
       setMovingItem(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setDialog({
         type: 'alert',
         title: '이동 실패',
-        message: err.message || '이동에 실패했습니다.',
+        message: getErrorMessage(err, '이동에 실패했습니다.'),
         onConfirm: () => setDialog(null)
       });
     }
@@ -390,8 +418,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       <div className="file-meta">FOLDER</div>
                       <div className="file-meta" style={{ textAlign: 'right' }}>—</div>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="row-action" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
-                          <Icon name="download" size={14} />
+                        <button className="row-action" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
+                          <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
                         </button>
                         <button className="row-action" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
@@ -424,8 +452,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       <div className="file-meta">{f.category}</div>
                       <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="row-action" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
-                          <Icon name="download" size={14} />
+                        <button className="row-action" title="다운로드" onClick={e => handleDownloadFile(f, e)} disabled={downloadingKey !== null}>
+                          <Icon name={downloadingKey === `file-${f.id}` ? 'spinner' : 'download'} size={14} />
                         </button>
                         <button className="row-action" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
@@ -450,8 +478,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         <Icon name="folder" size={40} color="var(--c-folder)" stroke={1.7} />
                       </div>
                       <div className="grid-card-actions">
-                        <button className="grid-action-btn" title="폴더 다운로드" onClick={e => { e.stopPropagation(); window.open(getFolderDownloadUrl(f.id)); }}>
-                          <Icon name="download" size={14} />
+                        <button className="grid-action-btn" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
+                          <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
                         </button>
                         <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
@@ -482,8 +510,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         }
                       </div>
                       <div className="grid-card-actions">
-                        <button className="grid-action-btn" title="다운로드" onClick={e => { e.stopPropagation(); window.open(getFileContentUrl(f.id, true)); }}>
-                          <Icon name="download" size={14} />
+                        <button className="grid-action-btn" title="다운로드" onClick={e => handleDownloadFile(f, e)} disabled={downloadingKey !== null}>
+                          <Icon name={downloadingKey === `file-${f.id}` ? 'spinner' : 'download'} size={14} />
                         </button>
                         <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
                           <Icon name="move" size={14} />
@@ -665,6 +693,7 @@ const filesStyles = `
   .file-meta{ font-size:13px; color:var(--fg-3); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-action{ width:28px; height:28px; border-radius:8px; display:grid; place-items:center; color:var(--fg-3); background:transparent; border:0; }
   .row-action:hover{ background:var(--surface-2); color:var(--fg); }
+  .row-action:disabled{ opacity:.5; cursor:not-allowed; }
 
   .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); gap:12px; }
   .grid-card{ border:1px solid var(--border-soft); border-radius:14px; overflow:hidden; cursor:default; background:var(--bg-2); box-shadow:var(--shadow-sm); }
@@ -978,6 +1007,11 @@ const filesStyles = `
     background: var(--surface-2);
     color: var(--fg);
     transform: scale(1.05);
+  }
+  .grid-action-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    transform: none;
   }
   @media (max-width: 768px) {
     .grid-card-actions {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../components/Icon';
-import { getFile, getFileContentUrl, formatBytes } from '../api/files';
+import { getFile, getFileContentUrl, formatBytes, downloadFileContent } from '../api/files';
 import type { FileResponseDto } from '../types';
 
 interface Props {
@@ -8,9 +8,15 @@ interface Props {
   onBack: () => void;
 }
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
 export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
 
   useEffect(() => {
     if (!fileId) return;
@@ -24,11 +30,23 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   if (fileId == null) return null;
 
   const fileUrl = getFileContentUrl(fileId, false);
-  const downloadUrl = getFileContentUrl(fileId, true);
 
   const isImage = file?.category === 'IMAGE';
   const isPdf = file?.extension === 'pdf';
   const isText = ['txt', 'log', 'json', 'md', 'html', 'css', 'js', 'ts', 'tsx'].includes(file?.extension || '');
+
+  async function handleDownload() {
+    if (!file || downloading) return;
+    setDownloadError('');
+    setDownloading(true);
+    try {
+      await downloadFileContent(file.id, file.name);
+    } catch (err: unknown) {
+      setDownloadError(getErrorMessage(err, '다운로드에 실패했습니다.'));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="viewer-page">
@@ -45,13 +63,14 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           </div>
         )}
         <div className="viewer-actions">
-          <a href={downloadUrl} className="vbtn-download" download>
-            <Icon name="download" size={14} /> 다운로드
-          </a>
+          <button className="vbtn-download" onClick={handleDownload} disabled={!file || downloading}>
+            <Icon name={downloading ? 'spinner' : 'download'} size={14} /> {downloading ? '다운로드 중...' : '다운로드'}
+          </button>
         </div>
       </div>
 
       <div className="viewer-body">
+        {downloadError && <div className="viewer-download-error">{downloadError}</div>}
         {loading ? (
           <div className="viewer-loader">
             <Icon name="spinner" size={28} />
@@ -72,9 +91,9 @@ export function ViewerScreen({ fileId, onBack }: Props) {
             </div>
             <h3>미리보기를 지원하지 않는 파일 형식입니다</h3>
             <p>이 파일은 브라우저에서 직접 열 수 없습니다. 다운로드하여 확인하세요.</p>
-            <a href={downloadUrl} className="vbtn-action" download>
-              <Icon name="download" size={16} /> 다운로드 받기
-            </a>
+            <button className="vbtn-action" onClick={handleDownload} disabled={downloading}>
+              <Icon name={downloading ? 'spinner' : 'download'} size={16} /> {downloading ? '다운로드 중...' : '다운로드 받기'}
+            </button>
           </div>
         )}
       </div>
@@ -151,9 +170,15 @@ const viewerStyles = `
     font-weight: 500;
     cursor: pointer;
     transition: background 0.15s;
+    border: 0;
   }
   .vbtn-download:hover {
     background: var(--accent-hover, #493fd6);
+  }
+  .vbtn-download:disabled,
+  .vbtn-action:disabled {
+    opacity: .65;
+    cursor: not-allowed;
   }
   .viewer-body {
     display: grid;
@@ -162,6 +187,19 @@ const viewerStyles = `
     overflow: hidden;
     position: relative;
     padding: 24px;
+  }
+  .viewer-download-error {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    max-width: calc(100% - 32px);
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(239, 68, 68, 0.18);
+    color: #fecaca;
+    font-size: 13px;
   }
   .viewer-loader {
     display: flex;
