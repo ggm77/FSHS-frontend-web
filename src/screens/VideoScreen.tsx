@@ -913,6 +913,7 @@ const videoStyles = `
   }
   .video-back{
     position:absolute; top:18px; left:18px;
+    z-index:11; /* 재생 오류 오버레이(z-index:10) 위에 떠야 항상 나갈 수 있다 */
     display:flex; align-items:center; gap:8px;
     color:#fff; opacity:0.85;
     background:rgba(0,0,0,0.4);

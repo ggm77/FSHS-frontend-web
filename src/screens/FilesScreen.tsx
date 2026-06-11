@@ -88,7 +88,15 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   useEffect(() => {
     if (rootFolderId == null) return;
-    loadFolder(rootFolderId, true);
+    // 미디어 하위 페이지에서 뒤로 돌아오거나 새로고침한 경우,
+    // history state에 남아 있는 폴더 위치를 복원한다.
+    const state = window.history.state;
+    if (state && state.type === 'folder' && typeof state.folderId === 'number') {
+      setPath(state.path || []);
+      loadFolder(state.folderId);
+    } else {
+      loadFolder(rootFolderId, true);
+    }
   }, [rootFolderId]);
 
   useEffect(() => {

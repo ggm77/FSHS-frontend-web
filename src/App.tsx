@@ -16,7 +16,16 @@ import { getUser } from './api/users';
 import { ApiError } from './api/client';
 import type { UserResponseDto, FileResponseDto } from './types';
 
-type Screen = 'files' | 'gallery' | 'video' | 'viewer' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+type Screen = 'files' | 'gallery' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+
+// 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
+// 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
+type MediaRoute = { type: 'video' | 'viewer'; fileId: number } | null;
+
+function parseMediaRoute(pathname: string): MediaRoute {
+  const m = pathname.match(/^\/(video|viewer)\/(\d+)\/?$/);
+  return m ? { type: m[1] as 'video' | 'viewer', fileId: Number(m[2]) } : null;
+}
 
 // localStorage에 캐시된 사용자 정보를 안전하게 읽는다.
 function loadCachedUser(): UserResponseDto | null {
@@ -156,9 +165,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('files');
   const [dark, setDark] = useState(false);
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
-  const [videoFileId, setVideoFileId] = useState<number | null>(null);
+  const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
+  // 목록에서 이미 받아 둔 파일 정보. 비디오 페이지가 메타데이터 재요청 없이 바로 재생을 시작하게 해준다.
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
-  const [viewerFileId, setViewerFileId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -171,35 +180,34 @@ export default function App() {
       window.history.replaceState({ screen: 'files' }, '');
     }
 
-    const handlePopState = (e: PopStateEvent) => {
-      const state = e.state;
-      if (state && state.type === 'video') {
-        setVideoFileId(state.fileId);
-        setScreen('video');
-      } else if (state && state.type === 'viewer') {
-        setViewerFileId(state.fileId);
-        setScreen('viewer');
-      } else if (state && state.screen) {
-        setScreen(state.screen);
-        setVideoFileId(null);
+    // 주소(경로)와 history state를 화면에 동기화한다.
+    // 경로가 미디어 라우트면 하위 페이지를 띄우고, 아니면 항목에 기록된 메인 화면을 복원한다.
+    const syncFromLocation = () => {
+      const route = parseMediaRoute(window.location.pathname);
+      setMediaRoute(route);
+      if (!route) {
         setVideoFile(null);
-        setViewerFileId(null);
-      } else {
-        setScreen('files');
-        setVideoFileId(null);
-        setVideoFile(null);
-        setViewerFileId(null);
+        const state = window.history.state;
+        if (state && state.screen) {
+          setScreen(state.screen as Screen);
+        } else if (state && state.type === 'folder') {
+          // FilesScreen이 push한 폴더 탐색 항목
+          setScreen('files');
+        }
       }
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    // 미디어 하위 페이지 진입/이탈(뒤로·앞으로)과 폴더 탐색 항목 이동 모두 popstate로 돌아온다.
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
   }, []);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        // 미디어 하위 페이지에서는 메인 화면이 보이지 않으므로 무시한다.
+        if (parseMediaRoute(window.location.pathname)) return;
         setScreen('search');
       }
     };
@@ -276,27 +284,33 @@ export default function App() {
     setSidebarOpen(false);
   }
 
+  // 미디어 하위 페이지로 이동한다. 떠나기 전에 현재 화면 이름을 현재 항목에 기록해 두어
+  // 뒤로가기로 돌아왔을 때 보던 화면(폴더 위치 포함)이 복원되게 한다.
+  function openMediaPage(path: string) {
+    window.history.replaceState({ ...(window.history.state || {}), screen }, '');
+    // fromApp: 앱 내부에서 진입했다는 표시(뒤로가기 처리용).
+    // pushState는 popstate를 발생시키지 않으므로 라우트 상태를 직접 갱신한다.
+    window.history.pushState({ fromApp: true }, '', path);
+    setMediaRoute(parseMediaRoute(path));
+  }
+
   function openVideo(fileId: number, fileData?: FileResponseDto) {
-    setVideoFileId(fileId);
     setVideoFile(fileData || null);
-    setScreen('video');
-    window.history.pushState({ type: 'video', fileId, fromScreen: screen }, '');
+    openMediaPage(`/video/${fileId}`);
   }
 
   function openViewer(fileId: number) {
-    setViewerFileId(fileId);
-    setScreen('viewer');
-    window.history.pushState({ type: 'viewer', fileId, fromScreen: screen }, '');
+    openMediaPage(`/viewer/${fileId}`);
   }
 
   function handleBack() {
-    if (window.history.state && (window.history.state.type === 'video' || window.history.state.type === 'viewer')) {
+    if (window.history.state && window.history.state.fromApp) {
       window.history.back();
     } else {
-      setScreen('files');
-      setVideoFileId(null);
+      // 공유 링크 등으로 미디어 페이지에 바로 들어온 경우: 돌아갈 항목이 없으니 메인으로 교체한다.
+      window.history.replaceState({ screen }, '', '/');
+      setMediaRoute(null);
       setVideoFile(null);
-      setViewerFileId(null);
     }
   }
 
@@ -304,18 +318,18 @@ export default function App() {
     return <LoginScreen onSignIn={handleSignIn} />;
   }
 
-  if (screen === 'video') {
+  if (mediaRoute?.type === 'video') {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
-        <VideoScreen fileId={videoFileId} initialFile={videoFile} onBack={handleBack} />
+        <VideoScreen fileId={mediaRoute.fileId} initialFile={videoFile} onBack={handleBack} />
       </div>
     );
   }
 
-  if (screen === 'viewer') {
+  if (mediaRoute?.type === 'viewer') {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#0f1015' }}>
-        <ViewerScreen fileId={viewerFileId} onBack={handleBack} />
+        <ViewerScreen fileId={mediaRoute.fileId} onBack={handleBack} />
       </div>
     );
   }
