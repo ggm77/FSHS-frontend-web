@@ -16,6 +16,13 @@ const CATEGORY_ICON: Record<string, string> = {
   DOCUMENT: 'doc', ARCHIVE: 'archive', ETC: 'doc', UNKNOWN: 'doc',
 };
 
+interface BreadcrumbItem {
+  label: string;
+  onClick?: () => void;
+  title?: string;
+  ellipsis?: boolean;
+}
+
 function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number }) {
   const iconName = file.extension === 'pdf' ? 'pdf'
     : file.extension === 'zip' || file.extension === 'rar' || file.extension === '7z' ? 'archive'
@@ -363,10 +370,21 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
-  const crumbItems = [
+  const crumbItems: BreadcrumbItem[] = [
     { label: '내 보관함', onClick: () => { loadFolder(rootFolderId!, true); } },
     ...path.map((p, i) => ({ label: p.name, onClick: () => navigateBreadcrumb(i) })),
   ];
+  const visibleCrumbItems: BreadcrumbItem[] = crumbItems.length > 3
+    ? [
+        crumbItems[0],
+        {
+          label: '...',
+          title: crumbItems.slice(1, -1).map(item => item.label).join(' / '),
+          ellipsis: true,
+        },
+        crumbItems[crumbItems.length - 1],
+      ]
+    : crumbItems;
 
   return (
     <>
@@ -377,10 +395,14 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         {/* Breadcrumb */}
         {path.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 13, color: 'var(--fg-3)' }}>
-            {crumbItems.map((c, i) => (
+            {visibleCrumbItems.map((c, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {i > 0 && <Icon name="chevronR" size={12} />}
-                <button className="btn ghost" style={{ height: 28, padding: '0 8px', fontSize: 13 }} onClick={c.onClick}>{c.label}</button>
+                {c.ellipsis ? (
+                  <span title={c.title} style={{ padding: '0 4px', color: 'var(--fg-3)' }}>{c.label}</span>
+                ) : (
+                  <button className="btn ghost" style={{ height: 28, padding: '0 8px', fontSize: 13 }} onClick={c.onClick}>{c.label}</button>
+                )}
               </span>
             ))}
           </div>
