@@ -1,4 +1,4 @@
-import { request, getCookie } from './client';
+import { request, getCookie, createApiErrorFromBody } from './client';
 import { downloadUrl, type DownloadProgress } from './download';
 import type { FileResponseDto, FileStatusDto } from '../types';
 
@@ -37,11 +37,11 @@ export async function uploadFile(
     };
 
     xhr.onload = () => {
-      if (xhr.status === 200) {
+      if (xhr.status >= 200 && xhr.status < 300) {
         const { fileUuid } = JSON.parse(xhr.responseText);
         resolve(fileUuid);
       } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
+        reject(createApiErrorFromBody(xhr.status, xhr.responseText || '', `업로드 실패: HTTP ${xhr.status}`));
       }
     };
     xhr.onerror = () => reject(new Error('Upload error'));

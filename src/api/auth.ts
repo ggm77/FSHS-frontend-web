@@ -1,6 +1,4 @@
-import { getCookie } from './client';
-
-const BASE = '/api/v2';
+import { BASE, createApiErrorFromResponse, getCookie } from './client';
 
 export async function login(username: string, password: string): Promise<void> {
   const body = new URLSearchParams({ username, password });
@@ -15,7 +13,7 @@ export async function login(username: string, password: string): Promise<void> {
     headers,
     body,
   });
-  if (!res.ok) throw new Error('로그인 실패');
+  if (!res.ok) throw await createApiErrorFromResponse(res, '로그인 실패');
 }
 
 export async function logout(): Promise<void> {
@@ -30,4 +28,3 @@ export async function logout(): Promise<void> {
     headers,
   });
 }
-

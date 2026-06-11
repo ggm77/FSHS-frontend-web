@@ -156,11 +156,14 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   async function handleCreateFolder() {
     if (!newFolderName.trim() || currentFolderId == null) return;
     setCreatingFolder(true);
+    setError('');
     try {
       await createFolder(currentFolderId, newFolderName.trim());
       setNewFolderName('');
       setShowNewFolder(false);
       loadFolder(currentFolderId);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '폴더를 만들지 못했습니다.'));
     } finally {
       setCreatingFolder(false);
     }
@@ -280,7 +283,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
       loadFolder(currentFolderId);
     } catch (err) {
       console.error('Upload sequence error:', err);
-      setError('파일 업로드 또는 처리 중 오류가 발생했습니다.');
+      setError(getErrorMessage(err, '파일 업로드 또는 처리 중 오류가 발생했습니다.'));
     } finally {
       setUploading(false);
       setTimeout(() => {

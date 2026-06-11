@@ -11,6 +11,7 @@ import type {
 } from 'hls.js';
 import { Icon } from '../components/Icon';
 import { getFile, getFileStreamUrl, getFileHlsUrl, getFileContentUrl, formatBytes } from '../api/files';
+import { createApiErrorFromResponse } from '../api/client';
 import type { FileResponseDto } from '../types';
 
 interface Props {
@@ -236,6 +237,161 @@ function isTranscodePlaylistUrl(url: string): boolean {
   return /\/stream\/index\.m3u8(?:[?#]|$)/.test(url);
 }
 
+const CONTENT_PREBUFFER_SECONDS = 4;
+const CONTENT_PREBUFFER_MAX_WAIT_MS = 10_000;
+const BUFFER_RANGE_FUZZ_SECONDS = 0.15;
+const TRANSCODE_CAPACITY_EXCEEDED_MESSAGE =
+  '트랜스코딩 처리 용량을 초과했습니다. 잠시 후 다시 시도해주세요.';
+
+function getBufferedAhead(media: HTMLMediaElement): number {
+  const current = media.currentTime;
+
+  for (let i = 0; i < media.buffered.length; i += 1) {
+    const start = media.buffered.start(i);
+    const end = media.buffered.end(i);
+
+    if (start - BUFFER_RANGE_FUZZ_SECONDS <= current && current <= end + BUFFER_RANGE_FUZZ_SECONDS) {
+      return Math.max(0, end - current);
+    }
+  }
+
+  return 0;
+}
+
+function getPrebufferTarget(media: HTMLMediaElement, seconds: number): number {
+  if (!Number.isFinite(media.duration) || media.duration <= 0) return seconds;
+  return Math.min(seconds, Math.max(0, media.duration - media.currentTime));
+}
+
+function hasEnoughPrebuffer(media: HTMLMediaElement, seconds: number): boolean {
+  const target = getPrebufferTarget(media, seconds);
+  if (target <= BUFFER_RANGE_FUZZ_SECONDS) {
+    return media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+  }
+
+  if (getBufferedAhead(media) >= target) return true;
+
+  // 일부 브라우저는 buffered range를 보수적으로 노출하지만 canplaythrough 상태는 갱신합니다.
+  return media.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA;
+}
+
+function waitForPrebuffer(
+  media: HTMLMediaElement,
+  seconds: number,
+  maxWaitMs: number,
+  isCurrent: () => boolean,
+): Promise<boolean> {
+  if (hasEnoughPrebuffer(media, seconds)) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    let done = false;
+    let timeoutId: number | null = null;
+    let intervalId: number | null = null;
+    const events = [
+      'progress',
+      'canplay',
+      'canplaythrough',
+      'loadeddata',
+      'loadedmetadata',
+      'durationchange',
+      'suspend',
+    ];
+
+    const cleanup = () => {
+      for (const event of events) media.removeEventListener(event, check);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+
+    const finish = (bufferedEnough: boolean) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(bufferedEnough);
+    };
+
+    function check() {
+      if (!isCurrent()) {
+        finish(false);
+        return;
+      }
+
+      if (hasEnoughPrebuffer(media, seconds)) {
+        finish(true);
+      }
+    }
+
+    for (const event of events) media.addEventListener(event, check);
+    intervalId = window.setInterval(check, 250);
+    timeoutId = window.setTimeout(() => finish(false), maxWaitMs);
+    check();
+  });
+}
+
+function waitForMetadata(
+  media: HTMLMediaElement,
+  maxWaitMs: number,
+  isCurrent: () => boolean,
+): Promise<boolean> {
+  if (media.readyState >= HTMLMediaElement.HAVE_METADATA) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    let done = false;
+    let timeoutId: number | null = null;
+    const events = ['loadedmetadata', 'durationchange', 'error'];
+
+    const cleanup = () => {
+      for (const event of events) media.removeEventListener(event, check);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
+
+    const finish = (loaded: boolean) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(loaded);
+    };
+
+    function check() {
+      if (!isCurrent()) {
+        finish(false);
+        return;
+      }
+
+      if (media.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        finish(true);
+      }
+    }
+
+    for (const event of events) media.addEventListener(event, check);
+    timeoutId = window.setTimeout(() => finish(false), maxWaitMs);
+    check();
+  });
+}
+
+function getHlsHttpStatus(data: { response?: { code?: number } }): number | null {
+  const code = data.response?.code;
+  return typeof code === 'number' ? code : null;
+}
+
+async function getMediaSourceErrorMessage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.ok) {
+      if (res.body) await res.body.cancel().catch(() => {});
+      return null;
+    }
+
+    const apiError = await createApiErrorFromResponse(res, `미디어 요청 실패: HTTP ${res.status}`);
+    if (apiError.code === 'TRANSCODE_CAPACITY_EXCEEDED' || apiError.status === 503) {
+      return apiError.response?.message || TRANSCODE_CAPACITY_EXCEEDED_MESSAGE;
+    }
+    return apiError.message;
+  } catch {
+    return null;
+  }
+}
+
 function withCacheBust(url: string): string {
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}_hls_reload=${Date.now()}`;
@@ -395,6 +551,9 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const hlsRef = useRef<Hls | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const resumeAtRef = useRef<number | null>(null);
+  const prebufferingRef = useRef(false);
+  const prebufferRunRef = useRef(0);
+  const playRequestedRef = useRef(true);
 
   // 실제 트랜스코딩 사용 여부: 수동 선택이 있으면 그것을, 없으면 자동 판별값을 따릅니다.
   const useTranscode = forcedMode ? forcedMode === 'stream' : autoStream;
@@ -455,6 +614,9 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     setForcedMode(null);
     setShowSettings(false);
     resumeAtRef.current = null;
+    playRequestedRef.current = true;
+    prebufferingRef.current = false;
+    prebufferRunRef.current += 1;
     setDuration(0);
     setStreamStart(0);
     setWaiting(false);
@@ -512,17 +674,65 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     if (!v || !videoSrc) return;
 
     let destroyed = false;
+    const shouldPrebufferContent = !useTranscode;
+    const prebufferRun = prebufferRunRef.current + 1;
+    prebufferRunRef.current = prebufferRun;
+    playRequestedRef.current = true;
+    prebufferingRef.current = false;
 
-    // 이전 hls.js 인스턴스 정리
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
+    const isCurrentNativeLoad = () => (
+      !destroyed &&
+      prebufferRunRef.current === prebufferRun &&
+      videoRef.current === v
+    );
+
+    const applyResumeTime = () => {
+      if (resumeAtRef.current == null) return;
+      try {
+        v.currentTime = resumeAtRef.current;
+      } catch {
+        // ignore invalid resume seek
+      }
+      resumeAtRef.current = null;
+    };
+
+    const playNativeWhenReady = async () => {
+      if (resumeAtRef.current != null) {
+        const metadataLoaded = await waitForMetadata(v, CONTENT_PREBUFFER_MAX_WAIT_MS, isCurrentNativeLoad);
+        if (!isCurrentNativeLoad()) return;
+        if (metadataLoaded) applyResumeTime();
+      }
+
+      if (shouldPrebufferContent) {
+        prebufferingRef.current = true;
+        setWaiting(true);
+
+        await waitForPrebuffer(
+          v,
+          CONTENT_PREBUFFER_SECONDS,
+          CONTENT_PREBUFFER_MAX_WAIT_MS,
+          isCurrentNativeLoad,
+        );
+
+        if (!isCurrentNativeLoad()) return;
+        prebufferingRef.current = false;
+      }
+
+      if (!playRequestedRef.current) {
+        setWaiting(false);
+        return;
+      }
+
+      v.play().catch((err) => {
+        console.warn('Autoplay blocked or failed:', err);
+        playRequestedRef.current = false;
+        setPlaying(false);
+        setWaiting(false);
+        prebufferingRef.current = false;
+      });
+    };
 
     if (useHlsJs) {
-      v.removeAttribute('src');
-      v.load();
-
       // MSE 기반 hls.js로 재생
       const hls = new Hls({
         xhrSetup: (xhr: XMLHttpRequest) => { xhr.withCredentials = true; },
@@ -549,6 +759,14 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (destroyed) return;
         console.warn('hls.js error:', data.type, data.details, 'fatal:', data.fatal);
+        const httpStatus = getHlsHttpStatus(data);
+        if (httpStatus === 503) {
+          hls.stopLoad();
+          setError(TRANSCODE_CAPACITY_EXCEEDED_MESSAGE);
+          setWaiting(false);
+          return;
+        }
+
         if (data.fatal) {
           // 치명적 에러 발생 시 자동 복구 시도
           switch (data.type) {
@@ -563,6 +781,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             default:
               console.error('hls.js: 복구 불가 에러');
               setError(`HLS 재생 오류: ${data.details}`);
+              setWaiting(false);
               break;
           }
         }
@@ -570,23 +789,29 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       hlsRef.current = hls;
       hls.attachMedia(v);
     } else {
-      // 네이티브 재생 (progressive /stream, /content, 또는 iOS 네이티브 HLS)
+      // 네이티브 재생 (progressive /stream, /content, 또는 iOS 네이티브 HLS).
+      // src는 JSX가 아니라 여기서만 설정한다. cleanup에서 지워 다운로드를 끊기 위함.
+      v.src = videoSrc;
       v.load();
-      v.play().catch((err) => {
-        console.warn('Autoplay blocked or failed:', err);
-        setPlaying(false);
-        setWaiting(false);
-      });
+      void playNativeWhenReady();
     }
 
     return () => {
       destroyed = true;
+      prebufferRunRef.current += 1;
+      prebufferingRef.current = false;
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      // 재생 페이지를 떠나거나 소스를 바꿀 때 진행 중인 미디어 다운로드를 중단한다.
+      // 엘리먼트가 DOM에서 빠져도 브라우저는 파일을 계속 받으므로(대용량에서 치명적),
+      // src를 비우고 load()를 다시 호출해 네트워크 요청을 명시적으로 끊어야 한다.
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
     };
-  }, [fileDuration, streamStart, useHlsJs, videoSrc]);
+  }, [fileDuration, streamStart, useHlsJs, useTranscode, videoSrc]);
 
   function handleTimeUpdate() {
     const v = videoRef.current;
@@ -598,6 +823,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
   function clearWaitingIfReady() {
     const v = videoRef.current;
+    if (prebufferingRef.current) return;
     if (!v || v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
     setWaiting(false);
   }
@@ -621,7 +847,19 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
-    if (playing) v.pause(); else v.play();
+    playRequestedRef.current = !playing;
+    if (playing) {
+      v.pause();
+    } else if (prebufferingRef.current) {
+      setWaiting(true);
+    } else {
+      v.play().catch((err) => {
+        console.warn('Play failed:', err);
+        playRequestedRef.current = false;
+        setPlaying(false);
+        setWaiting(false);
+      });
+    }
     setPlaying(!playing);
   }
 
@@ -634,17 +872,20 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       (v?.currentTime || currentTime) < duration - 1;
 
     if (endedBeforeKnownDuration) {
+      playRequestedRef.current = true;
       setPlaying(true);
       setWaiting(true);
       hlsRef.current?.startLoad(v?.currentTime ?? -1);
       v?.play().catch((err) => {
         console.warn('Autoplay blocked or failed:', err);
+        playRequestedRef.current = false;
         setPlaying(false);
         setWaiting(false);
       });
       return;
     }
 
+    playRequestedRef.current = false;
     setPlaying(false);
     setWaiting(false);
   }
@@ -686,6 +927,11 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
 
   const hideControls = isFullscreen && !userActive && playing;
+  const transcodeTransportLabel = TRANSCODE_METHOD === 'hls' ? 'HLS 세그먼트' : 'MP4 스트림';
+  const transcodeOutputLabel = TRANSCODE_METHOD === 'hls' ? 'H.264 HLS' : 'H.264 MP4';
+  const transcodeReasonLabel = forcedMode === 'stream'
+    ? '선택한 재생 방식에 따라'
+    : '원본 재생 호환성을 위해';
 
   return (
     <div
@@ -700,7 +946,6 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         {videoSrc ? (
           <video
             ref={videoRef}
-            src={useHlsJs ? undefined : videoSrc}
             playsInline
             preload="auto"
             style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
@@ -719,7 +964,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             onPlay={() => setPlaying(true)}
             onPause={() => {
               setPlaying(false);
-              setWaiting(false);
+              if (!prebufferingRef.current) setWaiting(false);
             }}
             onEnded={handleEnded}
             onWaiting={() => {
@@ -728,36 +973,30 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
             }}
             onPlaying={() => setWaiting(false)}
             onSeeking={() => setWaiting(true)}
-            onSeeked={() => setWaiting(false)}
-            onCanPlay={() => setWaiting(false)}
-            onCanPlayThrough={() => setWaiting(false)}
+            onSeeked={clearWaitingIfReady}
+            onCanPlay={clearWaitingIfReady}
+            onCanPlayThrough={clearWaitingIfReady}
             onLoadStart={() => setWaiting(true)}
-            onLoadedData={() => setWaiting(false)}
+            onLoadedData={clearWaitingIfReady}
             onProgress={clearWaitingIfReady}
             onVolumeChange={() => setVolume(videoRef.current?.volume || 1)}
             onError={() => {
               const mediaError = videoRef.current?.error;
               console.error('Video error:', mediaError);
-              if (mediaError) {
+              if (useTranscode && TRANSCODE_METHOD === 'stream') {
+                const failedSrc = videoSrc;
+                setError('트랜스코딩 스트림을 시작하지 못했습니다.');
+                void getMediaSourceErrorMessage(failedSrc).then((message) => {
+                  if (failedSrc === videoSrc && message) setError(message);
+                });
+              } else if (mediaError) {
                 setError(`재생 오류: ${mediaError.message || `코드 ${mediaError.code}`} (상태: ${mediaError.code})`);
               } else {
                 setError('비디오를 로드하는 중 오류가 발생했습니다.');
               }
+              setWaiting(false);
             }}
-          >
-            {/* hls.js 사용 시 src는 hls.js가 관리하므로 source 태그 불필요 */}
-            {/* iOS 등 네이티브 HLS 폴백 시에만 source 태그 사용 */}
-            {!useHlsJs && !videoSrc ? null : !useHlsJs && (
-              <source
-                src={videoSrc}
-                type={
-                  useTranscode
-                    ? (TRANSCODE_METHOD === 'hls' ? 'application/vnd.apple.mpegurl' : 'video/mp4')
-                    : (file?.mimeType || 'video/mp4')
-                }
-              />
-            )}
-          </video>
+          />
         ) : (
           <div style={{ color: 'var(--fg-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <Icon name="spinner" size={28} />
@@ -809,14 +1048,15 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
         {useTranscode && !isFullscreen && (
           <div className="transcoding-hud">
-            <div className="h">실시간 트랜스코딩 중</div>
+            <div className="h">서버 트랜스코딩 중</div>
             <div className="desc">
-              원본{file?.videoCodec ? ` 코덱(${file.videoCodec})` : ''}을 H.264로 실시간 변환해 전송 중입니다.
+              {transcodeReasonLabel} 서버 변환 슬롯에서 {transcodeTransportLabel}을 생성하고 있습니다.
+              슬롯이 가득 차면 새 변환 시작이 잠시 거절될 수 있습니다.
             </div>
             <div className="codec-row">
               <span className="src">{file?.videoCodec || '원본'}</span>
               <span className="arrow">→</span>
-              <span className="dst">H.264</span>
+              <span className="dst">{transcodeOutputLabel}</span>
             </div>
           </div>
         )}
@@ -880,7 +1120,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
                 >
                   <div className="si-main">
                     <span className="si-title">실시간 트랜스코딩</span>
-                    <span className="si-desc">H.264로 변환 · 호환성 ↑</span>
+                    <span className="si-desc">서버 슬롯 사용 · H.264 변환</span>
                   </div>
                   {useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
                 </button>

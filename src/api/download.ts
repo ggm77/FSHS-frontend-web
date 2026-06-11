@@ -1,4 +1,4 @@
-import { getCookie } from './client';
+import { createApiErrorFromResponse, getCookie } from './client';
 
 export interface DownloadProgress {
   loadedBytes: number;
@@ -163,8 +163,7 @@ export async function downloadUrl(
   });
 
   if (!res.ok) {
-    const message = await res.text().catch(() => '');
-    throw new Error(message || `다운로드 실패: HTTP ${res.status}`);
+    throw await createApiErrorFromResponse(res, `다운로드 실패: HTTP ${res.status}`);
   }
 
   const filename = parseFilename(res.headers.get('Content-Disposition')) || fallbackFilename;
