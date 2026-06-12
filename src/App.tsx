@@ -69,10 +69,10 @@ function Avatar({ username, size = 32 }: { username: string; size?: number }) {
   const initials = username.slice(0, 2).toUpperCase();
   return (
     <div style={{
-      width: size, height: size, borderRadius: '9px',
+      width: size, height: size, borderRadius: '50%',
       display: 'grid', placeItems: 'center',
       color: '#fff', fontWeight: 600, fontSize: size * 0.38, flexShrink: 0,
-      background: `hsl(${hue} 46% 48%)`,
+      background: `linear-gradient(135deg, hsl(${hue} 78% 58%), #3158ff)`,
     }}>
       {initials}
     </div>
@@ -83,15 +83,17 @@ function Sidebar({ active, onNav, user, className }: { active: string; onNav: (i
   return (
     <aside className={`sidebar ${className || ''}`}>
       <div className="sb-brand">
-        <div className="logo">F</div>
+        <div className="logo">
+          <Icon name="cube" size={22} color="currentColor" stroke={2} />
+        </div>
         <div>
           <div className="name">FSHS</div>
           <div className="host">fshs2.seohamin.com</div>
         </div>
       </div>
       <button className="sb-new" onClick={() => onNav('files')}>
-        <Icon name="upload" size={18} color="currentColor" stroke={2} />
-        업로드
+        <Icon name="folder" size={18} color="currentColor" stroke={2} />
+        파일 관리
       </button>
       <nav className="sb-nav">
         {NAV.map((g) => (
@@ -137,6 +139,7 @@ function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }:
       <button className="tb-menu-btn" onClick={onMenuClick}>
         <Icon name="menu" size={20} stroke={2} />
       </button>
+      <div className="mobile-title">FSHS</div>
       <div className="crumbs">
         {crumbs.map((c, i) => (
           <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -147,7 +150,7 @@ function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }:
       </div>
       <div className="tb-search" onClick={onSearch}>
         <Icon name="search" size={16} />
-        <span className="t">검색</span>
+        <span className="t">전체 폴더 검색</span>
         <kbd>⌘K</kbd>
       </div>
       <button className="tb-icon" title={dark ? '라이트 모드' : '다크 모드'} onClick={onToggleDark}>

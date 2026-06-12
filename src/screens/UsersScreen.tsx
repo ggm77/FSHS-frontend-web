@@ -62,8 +62,8 @@ export function UsersScreen({ currentUserId, onUserUpdate }: Props) {
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || '사용자 정보 수정 중 오류가 발생했습니다.');
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : '사용자 정보 수정 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -143,8 +143,8 @@ const userScreenStyles = `
   .profile-card {
     background: var(--bg-2);
     border: 1px solid var(--border-soft);
-    border-radius: 16px;
-    padding: 30px;
+    border-radius: 12px;
+    padding: 26px;
     max-width: 480px;
     margin-top: 20px;
     box-shadow: var(--shadow-sm);
@@ -174,14 +174,14 @@ const userScreenStyles = `
   .large-avatar {
     width: 60px;
     height: 60px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), #8b62f0);
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #5d7cff);
     color: #fff;
     display: grid;
     place-items: center;
     font-size: 22px;
     font-weight: 700;
-    box-shadow: 0 6px 20px rgba(91, 80, 232, 0.25);
+    box-shadow: 0 10px 24px rgba(49, 88, 255, 0.20);
   }
 
   .avatar-meta .name {
@@ -225,9 +225,9 @@ const userScreenStyles = `
 
   .form-group input {
     height: 42px;
-    border-radius: 9px;
-    border: 1px solid var(--border-soft);
-    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
     color: var(--fg);
     padding: 0 12px;
     font-size: 14px;

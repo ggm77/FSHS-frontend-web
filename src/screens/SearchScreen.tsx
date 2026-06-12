@@ -4,7 +4,9 @@ interface Props {
   initialQuery?: string;
 }
 
-export function SearchScreen({}: Props = {}) {
+export function SearchScreen(props: Props = {}) {
+  void props;
+
   return (
     <div className="content">
       <div className="page-h">

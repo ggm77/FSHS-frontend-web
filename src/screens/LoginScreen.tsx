@@ -33,11 +33,13 @@ export function LoginScreen({ onSignIn }: Props) {
       <style>{loginStyles}</style>
       <div className="login-card">
         <div className="login-left">
-          <div className="logo">F</div>
+          <div className="logo">
+            <Icon name="cube" size={48} color="currentColor" stroke={2} />
+          </div>
           {mode === 'login' ? (
             <>
-              <h2>로그인</h2>
-              <div className="lead">FSHS 홈 서버로 계속하세요. 내 파일은 항상 내 서버 안에 있습니다.</div>
+              <h2>FSHS</h2>
+              <div className="lead">My Private NAS</div>
             </>
           ) : (
             <>
@@ -146,65 +148,86 @@ export function LoginScreen({ onSignIn }: Props) {
 
 const loginStyles = `
   .login-shell{
-    min-height:100vh; width:100%;
+    min-height:100vh;
+    width:100%;
     display:grid; place-items:center;
-    background:var(--bg-shell);
+    background:
+      radial-gradient(circle at 50% 0%, rgba(49, 88, 255, 0.10), transparent 34%),
+      var(--bg-shell);
     padding:24px;
     box-sizing:border-box;
   }
   .login-card{
-    width:100%; max-width:920px;
-    min-height:520px;
+    width:100%;
+    max-width:390px;
+    min-height:0;
     background:var(--bg);
     border:1px solid var(--border-soft);
-    border-radius:22px;
+    border-radius:16px;
     box-shadow:var(--shadow-lg);
-    display:grid; grid-template-columns: 1fr 1fr;
+    display:grid;
+    grid-template-columns:1fr;
     overflow:hidden;
   }
   .login-left{
-    padding:48px 44px;
+    padding:54px 32px 18px;
     display:flex; flex-direction:column;
-    background:var(--sb-bg); color:var(--sb-fg);
+    align-items:center;
+    text-align:center;
+    background:var(--bg);
+    color:var(--fg);
   }
   .login-left .logo{
-    width:42px; height:42px; border-radius:12px;
-    background:linear-gradient(140deg, var(--accent), #8b62f0); color:#fff;
-    display:grid; place-items:center; font-weight:700; font-size:21px;
-    margin-bottom:26px; box-shadow:0 6px 20px rgba(91,80,232,0.45);
+    width:92px;
+    height:92px;
+    border-radius:26px;
+    color:var(--accent);
+    display:grid;
+    place-items:center;
+    margin-bottom:22px;
+    background:
+      linear-gradient(var(--bg), var(--bg)) padding-box,
+      linear-gradient(135deg, rgba(49, 88, 255, .75), rgba(49, 88, 255, .20)) border-box;
+    border:1px solid transparent;
+    box-shadow:0 18px 44px rgba(49, 88, 255, .16);
   }
   .login-left h2{
-    font-size:30px; font-weight:680; letter-spacing:-0.02em;
-    margin:0 0 10px; line-height:1.18; color:var(--sb-fg);
+    font-size:32px;
+    font-weight:850;
+    margin:0;
+    line-height:1.1;
+    color:var(--fg);
   }
   .login-left .lead{
-    font-size:14.5px; line-height:1.55; color:var(--sb-fg-dim);
-    max-width:320px;
+    font-size:13.5px;
+    line-height:1.55;
+    color:var(--fg-3);
+    margin-top:6px;
+    max-width:260px;
   }
   .login-left .feat-list{
-    margin-top:auto; display:flex; flex-direction:column; gap:13px;
-    padding-top:32px;
+    display:none;
   }
   .login-left .feat-list .it{
     display:flex; align-items:center; gap:12px;
-    font-size:13.5px; color:var(--sb-fg);
+    font-size:13.5px; color:var(--fg);
   }
   .login-left .feat-list .it .ic{
     width:34px; height:34px; border-radius:10px;
-    background:rgba(255,255,255,0.07); color:#b9b1ff;
+    background:var(--accent-soft); color:var(--accent);
     display:grid; place-items:center; flex-shrink:0;
   }
 
   .login-right{
     min-width:0;
-    padding:48px 44px;
+    padding:12px 28px 34px;
     display:flex; flex-direction:column; justify-content:center;
     background:var(--bg);
   }
 
   @media (max-width: 640px) {
     .login-shell{
-      padding:16px;
+      padding:14px;
       align-items:flex-start;
       justify-items:stretch;
       padding-top:env(safe-area-inset-top, 16px);
@@ -212,27 +235,25 @@ const loginStyles = `
     .login-card{
       width:100%;
       grid-template-columns:1fr;
-      min-height:unset;
       border-radius:16px;
     }
     .login-left{
-      padding:28px 24px 20px;
+      padding:48px 24px 18px;
     }
     .login-left .logo{
-      width:36px; height:36px; font-size:18px; border-radius:10px;
-      margin-bottom:16px;
+      width:88px;
+      height:88px;
+      border-radius:24px;
+      margin-bottom:20px;
     }
     .login-left h2{
-      font-size:22px;
+      font-size:31px;
     }
     .login-left .lead{
-      font-size:13.5px;
-    }
-    .login-left .feat-list{
-      display:none;
+      font-size:13px;
     }
     .login-right{
-      padding:24px 24px 32px;
+      padding:10px 20px 28px;
     }
   }
 
@@ -240,23 +261,31 @@ const loginStyles = `
   .field .input{
     position:relative; min-width:0;
     display:flex; align-items:center;
-    height:54px; padding:0 16px;
-    background:var(--bg);
+    height:52px; padding:0 15px;
+    background:var(--surface-1);
     border:1px solid var(--border);
     border-radius:8px;
-    transition:border-color .15s, box-shadow .15s;
+    transition:border-color .15s, box-shadow .15s, background .15s;
   }
   .field .input:focus-within{
-    border-color:var(--accent); border-width:2px; padding:0 15px;
+    background:var(--bg);
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(49, 88, 255, .12);
   }
   .field .input input{
     flex:1; min-width:0; border:0; background:transparent; color:var(--fg);
-    font:inherit; font-size:16px; outline:none;
+    font:inherit; font-size:15px; outline:none;
   }
   .field .input .lbl{
-    position:absolute; top:-9px; left:10px;
-    background:var(--bg); padding:0 6px; white-space:nowrap;
-    font-size:12px; color:var(--fg-3);
+    position:absolute;
+    top:-9px;
+    left:10px;
+    background:var(--bg);
+    padding:0 6px;
+    white-space:nowrap;
+    font-size:12px;
+    color:var(--fg-3);
+    font-weight:650;
   }
   .field .input .eye{background:transparent; border:0; color:var(--fg-3)}
 
@@ -270,10 +299,10 @@ const loginStyles = `
     padding:8px 12px; border-radius:8px;
   }
   .link-btn:hover{background:var(--accent-soft)}
-  .login-actions .btn.primary{height:40px; padding:0 24px}
+  .login-actions .btn.primary{height:40px; padding:0 24px; border-radius:8px}
 
   .session-host{
-    margin-top:28px; padding-top:18px;
+    margin-top:22px; padding-top:16px;
     border-top:1px solid var(--hairline);
     display:flex; align-items:center; gap:8px; color:var(--fg-4);
     font-size:12px;
@@ -287,7 +316,6 @@ const loginStyles = `
     background:var(--surface-2); color:var(--fg-3); flex-shrink:0;
   }
   .setup-steps .num.done{background:var(--accent); color:#fff}
-  [data-theme="dark"] .setup-steps .num.done{color:#062e6f}
   .setup-steps .num.cur{background:var(--accent-soft); color:var(--accent)}
   .setup-steps .line{flex:1; height:2px; background:var(--hairline)}
   .setup-steps .line.done{background:var(--accent)}

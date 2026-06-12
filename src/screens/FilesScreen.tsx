@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent } from '../api/files';
@@ -21,6 +21,31 @@ interface BreadcrumbItem {
   onClick?: () => void;
   title?: string;
   ellipsis?: boolean;
+}
+
+type FolderPathItem = { id: number; name: string };
+type HistoryMode = 'push' | 'replace' | 'none';
+
+function getFolderIdFromHash(): number | null {
+  let hash = '';
+  try {
+    hash = decodeURIComponent(window.location.hash.slice(1).trim());
+  } catch {
+    return null;
+  }
+
+  if (!hash) return null;
+
+  const match = hash.match(/^(?:folder\/|folder=)?(\d+)$/);
+  if (!match) return null;
+
+  const folderId = Number(match[1]);
+  return Number.isSafeInteger(folderId) && folderId > 0 ? folderId : null;
+}
+
+function getFolderHashUrl(folderId: number, rootFolderId: number | null): string {
+  const baseUrl = `${window.location.pathname}${window.location.search}`;
+  return rootFolderId != null && folderId === rootFolderId ? baseUrl : `${baseUrl}#${folderId}`;
 }
 
 function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number }) {
@@ -54,7 +79,7 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
-  const [path, setPath] = useState<{ id: number; name: string }[]>([]);
+  const [path, setPath] = useState<FolderPathItem[]>([]);
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,70 +118,117 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
   const downloadingKey = downloadState?.key ?? null;
 
-  useEffect(() => {
-    if (rootFolderId == null) return;
-    // 미디어 하위 페이지에서 뒤로 돌아오거나 새로고침한 경우,
-    // history state에 남아 있는 폴더 위치를 복원한다.
-    const state = window.history.state;
-    if (state && state.type === 'folder' && typeof state.folderId === 'number') {
-      setPath(state.path || []);
-      loadFolder(state.folderId);
+  const syncFolderHistory = useCallback((folderId: number, nextPath: FolderPathItem[], mode: HistoryMode) => {
+    if (mode === 'none') return;
+
+    const state = folderId === rootFolderId
+      ? { screen: 'files' }
+      : { type: 'folder', screen: 'files', folderId, path: nextPath };
+    const url = getFolderHashUrl(folderId, rootFolderId);
+
+    if (mode === 'push') {
+      window.history.pushState(state, '', url);
     } else {
-      loadFolder(rootFolderId, true);
+      window.history.replaceState(state, '', url);
     }
   }, [rootFolderId]);
 
-  useEffect(() => {
-    const handlePop = (e: PopStateEvent) => {
-      const state = e.state;
-      if (!state) return;
-      
-      if (state.type === 'folder') {
-        setPath(state.path || []);
-        loadFolder(state.folderId);
-      } else if (state.screen === 'files') {
-        setPath([]);
-        if (rootFolderId != null) loadFolder(rootFolderId);
-      }
-    };
-    
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
+  const buildPathToFolder = useCallback(async (target: FolderResponseDto): Promise<FolderPathItem[]> => {
+    if (rootFolderId == null || target.id === rootFolderId || target.isRoot) return [];
+
+    const nextPath: FolderPathItem[] = [{ id: target.id, name: target.name }];
+    const seen = new Set<number>([target.id]);
+    let parentFolderId: number | null = target.parentFolderId ?? null;
+
+    while (parentFolderId != null && parentFolderId !== rootFolderId && !seen.has(parentFolderId)) {
+      seen.add(parentFolderId);
+      const parent = await getFolder(parentFolderId);
+      if (parent.id === rootFolderId || parent.isRoot) break;
+
+      nextPath.unshift({ id: parent.id, name: parent.name });
+      parentFolderId = parent.parentFolderId ?? null;
+    }
+
+    return nextPath;
   }, [rootFolderId]);
 
-  async function loadFolder(folderId: number, reset = false) {
+  const loadFolder = useCallback(async (
+    folderId: number,
+    reset = false,
+    nextPath?: FolderPathItem[],
+  ): Promise<FolderResponseDto | null> => {
     setLoading(true);
     setError('');
     setSelected(null);
     try {
       const data = await getFolder(folderId);
       setFolder(data);
-      if (reset) setPath([]);
+      if (nextPath) setPath(nextPath);
+      else if (reset) setPath([]);
+      return data;
     } catch {
       setError('폴더를 불러오지 못했습니다.');
+      return null;
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  const loadFolderFromLocation = useCallback(async (historyMode: HistoryMode) => {
+    if (rootFolderId == null) return;
+
+    const folderId = getFolderIdFromHash() ?? rootFolderId;
+    const data = await loadFolder(folderId, folderId === rootFolderId);
+    if (!data) return;
+
+    try {
+      const nextPath = await buildPathToFolder(data);
+      setPath(nextPath);
+      syncFolderHistory(data.id, nextPath, historyMode);
+    } catch {
+      const nextPath = data.id === rootFolderId || data.isRoot ? [] : [{ id: data.id, name: data.name }];
+      setPath(nextPath);
+      syncFolderHistory(data.id, nextPath, historyMode);
+    }
+  }, [buildPathToFolder, loadFolder, rootFolderId, syncFolderHistory]);
+
+  useEffect(() => {
+    if (rootFolderId == null) return;
+    loadFolderFromLocation('replace');
+  }, [loadFolderFromLocation, rootFolderId]);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      if (rootFolderId == null) return;
+      loadFolderFromLocation('replace');
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, [loadFolderFromLocation, rootFolderId]);
 
   function navigateTo(f: SimpleFolderResponseDto) {
     const newPath = [...path, { id: f.id, name: f.name }];
     setPath(newPath);
     loadFolder(f.id);
-    window.history.pushState({ type: 'folder', folderId: f.id, path: newPath }, '');
+    syncFolderHistory(f.id, newPath, 'push');
   }
 
   function navigateBreadcrumb(idx: number) {
     if (idx < 0) {
       setPath([]);
       loadFolder(rootFolderId!);
-      window.history.pushState({ screen: 'files' }, '');
+      syncFolderHistory(rootFolderId!, [], 'push');
     } else {
       const newPath = path.slice(0, idx + 1);
       const target = newPath[idx];
       setPath(newPath);
       loadFolder(target.id);
-      window.history.pushState({ type: 'folder', folderId: target.id, path: newPath }, '');
+      syncFolderHistory(target.id, newPath, 'push');
     }
   }
 
@@ -371,7 +443,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   }
 
   const crumbItems: BreadcrumbItem[] = [
-    { label: '내 보관함', onClick: () => { loadFolder(rootFolderId!, true); } },
+    { label: '내 보관함', onClick: () => navigateBreadcrumb(-1) },
     ...path.map((p, i) => ({ label: p.name, onClick: () => navigateBreadcrumb(i) })),
   ];
   const visibleCrumbItems: BreadcrumbItem[] = crumbItems.length > 3
@@ -389,12 +461,22 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   return (
     <>
       <style>{filesStyles}</style>
-      <div className="content">
+      <div className="content files-content">
         {error && <div style={{ padding: '12px 16px', background: 'rgba(220,75,62,0.1)', borderRadius: 10, color: 'var(--bad)', marginBottom: 16 }}>{error}</div>}
+
+        <div className="file-page-head">
+          <div>
+            <h1>파일 관리</h1>
+            <p>
+              {path.length > 0 ? path[path.length - 1].name : '내 저장소'}
+              {folder ? ` · ${folder.folders.length + folder.files.length}개 항목` : ' · 불러오는 중'}
+            </p>
+          </div>
+        </div>
 
         {/* Breadcrumb */}
         {path.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 13, color: 'var(--fg-3)' }}>
+          <div className="file-breadcrumbs">
             {visibleCrumbItems.map((c, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {i > 0 && <Icon name="chevronR" size={12} />}
@@ -726,9 +808,39 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 }
 
 const filesStyles = `
+  .files-content{
+    padding-top:18px;
+  }
+  .file-page-head{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .file-page-head h1{
+    margin:0;
+    font-size:22px;
+    font-weight:800;
+    color:var(--fg);
+  }
+  .file-page-head p{
+    margin:5px 0 0;
+    font-size:13px;
+    color:var(--fg-3);
+  }
+  .file-breadcrumbs{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-bottom:12px;
+    font-size:13px;
+    color:var(--fg-3);
+    overflow-x:auto;
+  }
   .files-toolbar{
-    display:flex; align-items:center; gap:10px;
-    padding:4px 2px 16px;
+    display:flex; align-items:center; gap:8px;
+    padding:0 0 14px;
   }
   .files-toolbar .spacer{ flex:1; }
 
@@ -751,60 +863,71 @@ const filesStyles = `
   .folder-card .fi{
     width:40px; height:40px; border-radius:11px;
     display:grid; place-items:center; flex-shrink:0;
-    background:rgba(179,154,107,0.16);
+    background:var(--accent-soft);
   }
   .folder-card .nm{ font-size:13.5px; font-weight:600; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .folder-card .meta{ font-size:11.5px; color:var(--fg-3); margin-top:3px; white-space:nowrap; }
   .folder-card .more{ width:28px; height:28px; border-radius:8px; border:0; background:transparent; color:var(--fg-3); display:grid; place-items:center; }
   .folder-card .more:hover{ background:var(--surface-1); color:var(--fg); }
 
-  .file-card{ overflow:hidden; }
+  .file-card{
+    overflow:hidden;
+    border-radius:12px;
+    border-color:var(--border-soft);
+    background:var(--bg);
+  }
   .file-row{
     display:grid;
-    grid-template-columns: minmax(0, 2.6fr) 1.1fr 1.1fr 0.9fr 80px;
+    grid-template-columns:minmax(0, 2.8fr) 1.05fr 0.85fr 0.85fr 96px;
     align-items:center; gap:14px;
-    padding:0 16px; height:48px;
+    padding:0 14px; height:46px;
     border-top:1px solid var(--hairline);
     cursor:default;
   }
   .file-row.head{
-    border-top:0; height:42px;
-    font-size:12px; font-weight:650; color:var(--fg-3);
-    text-transform:uppercase; letter-spacing:0.03em;
+    border-top:0; height:40px;
+    font-size:12px; font-weight:750; color:var(--fg-3);
     background:var(--bg-3);
   }
   .file-row:not(.head):hover{ background:var(--surface-1); }
   .file-row.selected{ background:var(--accent-soft) !important; }
 
-  .file-name{ display:flex; align-items:center; gap:13px; min-width:0; font-size:13.5px; font-weight:550; color:var(--fg); }
+  .file-name{ display:flex; align-items:center; gap:10px; min-width:0; font-size:13px; font-weight:650; color:var(--fg); }
   .file-name .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .file-thumb-sm{ width:26px; height:26px; border-radius:7px; flex-shrink:0; display:grid; place-items:center; overflow:hidden; }
-  .file-meta{ font-size:13px; color:var(--fg-3); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-thumb-sm{
+    width:28px; height:28px; border-radius:8px;
+    flex-shrink:0; display:grid; place-items:center; overflow:hidden;
+    background:var(--accent-soft);
+  }
+  .file-meta{ font-size:12.5px; color:var(--fg-3); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .row-action{ width:28px; height:28px; border-radius:8px; display:grid; place-items:center; color:var(--fg-3); background:transparent; border:0; }
-  .row-action:hover{ background:var(--surface-2); color:var(--fg); }
+  .row-action:hover{ background:var(--surface-2); color:var(--accent); }
   .row-action:disabled{ opacity:.5; cursor:not-allowed; }
 
-  .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); gap:12px; }
-  .grid-card{ border:1px solid var(--border-soft); border-radius:14px; overflow:hidden; cursor:default; background:var(--bg-2); box-shadow:var(--shadow-sm); }
-  .grid-card:hover{ box-shadow:var(--shadow-md); }
-  .grid-card .gc-head{ display:flex; align-items:center; gap:10px; padding:12px 12px 10px; font-size:13px; font-weight:600; }
+  .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
+  .grid-card{ border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; cursor:default; background:var(--bg); box-shadow:var(--shadow-sm); }
+  .grid-card:hover{ box-shadow:var(--shadow-md); transform:translateY(-1px); }
+  .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .grid-card .gc-prev{ height:130px; margin:0 12px 12px; border-radius:9px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
+  .grid-card .gc-prev{ height:124px; margin:0 12px 12px; border-radius:8px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
 
   .upload-status-widget {
     position: fixed;
     bottom: 24px;
     right: 24px;
     width: 320px;
-    background: rgba(30, 32, 40, 0.85);
+    background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
     z-index: 1000;
     overflow: hidden;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  [data-theme="dark"] .upload-status-widget {
+    background: rgba(25, 30, 40, 0.92);
   }
   
   @keyframes slideUp {
@@ -820,7 +943,7 @@ const filesStyles = `
 
   .upload-status-widget .widget-header {
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--hairline);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -828,8 +951,8 @@ const filesStyles = `
 
   .upload-status-widget .widget-header .title {
     font-size: 13.5px;
-    font-weight: 600;
-    color: #fff;
+    font-weight: 750;
+    color: var(--fg);
     display: flex;
     align-items: center;
   }
@@ -848,8 +971,8 @@ const filesStyles = `
 
   .upload-status-widget .file-name-txt {
     font-size: 12.5px;
-    color: #fff;
-    font-weight: 500;
+    color: var(--fg);
+    font-weight: 650;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -858,7 +981,7 @@ const filesStyles = `
 
   .upload-status-widget .pct-txt {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--fg-3);
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     flex-shrink: 0;
@@ -867,20 +990,20 @@ const filesStyles = `
   .download-status-widget .download-byte-row {
     margin-top: 8px;
     font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.62);
+    color: var(--fg-3);
     font-variant-numeric: tabular-nums;
   }
 
   .upload-status-widget .widget-progress-bg {
     height: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-2);
     border-radius: 99px;
     overflow: hidden;
   }
 
   .upload-status-widget .widget-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent, #5b50e8), #8b62f0);
+    background: linear-gradient(90deg, var(--accent), #5d7cff);
     border-radius: 99px;
     transition: width 0.15s ease-out;
   }
@@ -914,21 +1037,24 @@ const filesStyles = `
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(30, 32, 40, 0.9);
+    background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
     padding: 12px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-lg);
     z-index: 1000;
     max-width: 90%;
     width: 680px;
     animation: slideUpMove 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  [data-theme="dark"] .move-banner {
+    background: rgba(25, 30, 40, 0.94);
   }
   
   @keyframes slideUpMove {
@@ -946,7 +1072,7 @@ const filesStyles = `
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #fff;
+    color: var(--fg);
     font-size: 13px;
     min-width: 0;
   }
@@ -972,6 +1098,15 @@ const filesStyles = `
   }
 
   @media (max-width: 768px) {
+    .upload-status-widget {
+      left: 14px;
+      right: 14px;
+      width: auto;
+      bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    .download-status-widget {
+      bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+    }
     .move-banner {
       flex-direction: column;
       gap: 12px;
@@ -979,7 +1114,7 @@ const filesStyles = `
       width: calc(100% - 32px);
       left: 16px;
       transform: none;
-      bottom: 16px;
+      bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
     }
     
     @keyframes slideUpMove {
@@ -1011,9 +1146,9 @@ const filesStyles = `
     width: 360px;
     background: var(--bg-2);
     border: 1px solid var(--border-soft);
-    border-radius: 16px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
   }
   
   .confirm-modal .modal-header {
@@ -1059,7 +1194,7 @@ const filesStyles = `
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    background: var(--bg-3);
+    background: var(--bg);
     border-top: 1px solid var(--hairline);
   }
   
@@ -1093,7 +1228,7 @@ const filesStyles = `
     display: grid;
     place-items: center;
     color: var(--fg-3);
-    background: var(--bg-2);
+    background: var(--bg);
     border: 1px solid var(--border-soft);
     box-shadow: var(--shadow-sm);
     cursor: pointer;
@@ -1101,7 +1236,7 @@ const filesStyles = `
   }
   .grid-action-btn:hover {
     background: var(--surface-2);
-    color: var(--fg);
+    color: var(--accent);
     transform: scale(1.05);
   }
   .grid-action-btn:disabled {
