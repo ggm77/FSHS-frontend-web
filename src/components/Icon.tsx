@@ -72,6 +72,7 @@ const PATHS: Record<string, string> = {
   move:        '<path d="M3 6.5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 12.5h8M13 9.5l3 3-3 3"/>',
   star:        '<path d="m12 3 2.7 6 6.3.6-4.8 4.4 1.5 6.5L12 17l-5.7 3.5L7.8 14 3 9.6 9.3 9z"/>',
   cube:        '<path d="m12 2 8 4.5v9L12 22l-8-4.5v-9z"/><path d="M12 12 4 7.5M12 12l8-4.5M12 12v10"/><path d="m8 4.3 8 4.5"/>',
+  logout:      '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
 };
 
 interface IconProps {

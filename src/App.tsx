@@ -147,7 +147,7 @@ function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
         <Icon name={dark ? 'sun' : 'moon'} size={18} />
       </button>
       <button className="tb-icon" title="로그아웃" onClick={onLogout}>
-        <Icon name="power" size={18} />
+        <Icon name="logout" size={18} />
       </button>
     </div>
   );
