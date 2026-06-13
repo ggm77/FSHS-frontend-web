@@ -34,7 +34,7 @@ export function LoginScreen({ onSignIn }: Props) {
       <div className="login-card">
         <div className="login-left">
           <div className="logo">
-            <img src="/logo.png" alt="FSHS" style={{ width: 96, height: 96, objectFit: 'contain' }} />
+            <img src="/logo.png" alt="FSHS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           {mode === 'login' ? (
             <>
@@ -156,6 +156,8 @@ const loginStyles = `
       var(--bg-shell);
     padding:24px;
     box-sizing:border-box;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .login-card{
     width:100%;
@@ -227,27 +229,25 @@ const loginStyles = `
 
   @media (max-width: 640px) {
     .login-shell{
-      padding:14px;
-      align-items:flex-start;
-      justify-items:stretch;
-      padding-top:env(safe-area-inset-top, 16px);
+      padding:max(env(safe-area-inset-top, 16px), 16px) 20px max(env(safe-area-inset-bottom, 16px), 16px);
+      align-items:center;
     }
     .login-card{
       width:100%;
-      grid-template-columns:1fr;
+      max-width:360px;
       border-radius:16px;
     }
     .login-left{
-      padding:48px 24px 18px;
+      padding:36px 24px 14px;
     }
     .login-left .logo{
-      width:88px;
-      height:88px;
-      border-radius:24px;
-      margin-bottom:20px;
+      width:80px;
+      height:80px;
+      border-radius:22px;
+      margin-bottom:16px;
     }
     .login-left h2{
-      font-size:31px;
+      font-size:28px;
     }
     .login-left .lead{
       font-size:13px;
