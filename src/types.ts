@@ -28,6 +28,7 @@ export type FileCategory = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'ARCHIVE' 
 
 export interface FileResponseDto {
   id: number;
+  uuid: string;
   ownerId: number;
   name: string;
   baseName: string;

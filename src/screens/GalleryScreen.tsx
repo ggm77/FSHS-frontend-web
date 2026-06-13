@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder } from '../api/folders';
-import { getFileContentUrl } from '../api/files';
+import { getFileThumbnailUrl } from '../api/files';
 import type { FileResponseDto } from '../types';
 
 interface Props {
@@ -119,7 +119,7 @@ export function GalleryScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) 
                   onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id, f) : onOpenFile(f.id)}>
                   {f.category === 'IMAGE' ? (
                     <img
-                      src={getFileContentUrl(f.id, false)}
+                      src={getFileThumbnailUrl(f.uuid)}
                       alt={f.name}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       loading="lazy"
