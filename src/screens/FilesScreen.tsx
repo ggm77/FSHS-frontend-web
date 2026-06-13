@@ -609,16 +609,16 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
               <Icon name="plus" size={15} /> 새 폴더
             </button>
             {showNewFolder && (
-              <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 20, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, boxShadow: 'var(--shadow-md)', display: 'flex', gap: 8 }}>
+              <div className="new-folder-form">
                 <input
+                  className="new-folder-input"
                   value={newFolderName}
                   onChange={e => setNewFolderName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
                   autoFocus
-                  style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '4px 10px', font: 'inherit', background: 'var(--bg)', color: 'var(--fg)', outline: 'none' }}
                 />
-                <button className="btn primary" style={{ height: 32 }} onClick={handleCreateFolder} disabled={creatingFolder}>만들기</button>
-                <button className="btn" style={{ height: 32 }} onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>취소</button>
+                <button className="btn primary new-folder-btn" onClick={handleCreateFolder} disabled={creatingFolder}>만들기</button>
+                <button className="btn new-folder-btn" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>취소</button>
               </div>
             )}
           </div>
@@ -987,6 +987,20 @@ const filesStyles = `
     padding:0 0 14px;
   }
   .files-toolbar .spacer{ flex:1; }
+  .new-folder-form{
+    position:absolute; top:44px; left:0; z-index:20;
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:10px; padding:10px;
+    box-shadow:var(--shadow-md);
+    display:flex; gap:8px; align-items:center;
+    white-space:nowrap;
+  }
+  .new-folder-input{
+    border:1px solid var(--border); border-radius:7px;
+    padding:4px 10px; font:inherit;
+    background:var(--bg); color:var(--fg); outline:none;
+  }
+  .new-folder-btn{ height:32px; }
   .sort-controls{
     display:flex; align-items:center; gap:8px;
   }
@@ -1133,6 +1147,20 @@ const filesStyles = `
     .files-toolbar > *{
       flex-shrink:0;
     }
+    .new-folder-form{
+      position:fixed; left:0; right:0; bottom:0; top:auto;
+      border-radius:16px 16px 0 0;
+      border:none; border-top:1px solid var(--border);
+      padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom));
+      z-index:100; box-shadow:0 -4px 24px rgba(0,0,0,0.18);
+      flex-wrap:wrap;
+    }
+    .new-folder-input{
+      flex:1; min-width:0; height:40px;
+      font-size:16px; /* iOS 자동 줌 방지 */
+      padding:8px 12px;
+    }
+    .new-folder-btn{ height:40px; }
   }
 
   .upload-status-widget {
