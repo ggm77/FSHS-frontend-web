@@ -53,17 +53,6 @@ const NAV = [
   ]},
 ];
 
-const CRUMBS: Record<string, string[]> = {
-  files:   ['파일', '내 보관함'],
-  gallery: ['갤러리'],
-  search:  ['검색'],
-  sync:    ['동기화'],
-  share:   ['공유'],
-  users:   ['사용자'],
-  settings:['설정'],
-  admin:   ['대시보드'],
-};
-
 function Avatar({ username, size = 32 }: { username: string; size?: number }) {
   const hue = username.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   const initials = username.slice(0, 2).toUpperCase();
@@ -91,10 +80,6 @@ function Sidebar({ active, onNav, user, className }: { active: string; onNav: (i
           <div className="host">fshs2.seohamin.com</div>
         </div>
       </div>
-      <button className="sb-new" onClick={() => onNav('files')}>
-        <Icon name="folder" size={18} color="currentColor" stroke={2} />
-        파일 관리
-      </button>
       <nav className="sb-nav">
         {NAV.map((g) => (
           <div className="sb-group" key={g.group}>
@@ -126,8 +111,7 @@ function Sidebar({ active, onNav, user, className }: { active: string; onNav: (i
   );
 }
 
-function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
-  crumbs: string[];
+function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
   onSearch: () => void;
   dark: boolean;
   onToggleDark: () => void;
@@ -140,14 +124,7 @@ function TopBar({ crumbs, onSearch, dark, onToggleDark, onLogout, onMenuClick }:
         <Icon name="menu" size={20} stroke={2} />
       </button>
       <div className="mobile-title">FSHS</div>
-      <div className="crumbs">
-        {crumbs.map((c, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            {i > 0 && <span className="sep">›</span>}
-            <span className={'c' + (i === crumbs.length - 1 ? ' cur' : '')}>{c}</span>
-          </span>
-        ))}
-      </div>
+      <div className="tb-spacer" />
       <div className="tb-search" onClick={onSearch}>
         <Icon name="search" size={16} />
         <span className="t">전체 폴더 검색</span>
@@ -345,7 +322,6 @@ export default function App() {
       <Sidebar active={screen} onNav={handleNav} user={user} className={sidebarOpen ? 'open' : ''} />
       <main className="main">
         <TopBar
-          crumbs={CRUMBS[screen] || ['홈']}
           onSearch={() => setScreen('search')}
           dark={dark}
           onToggleDark={() => setDark(v => !v)}

@@ -165,25 +165,6 @@ button:disabled { cursor: not-allowed; }
   display: none;
 }
 
-.sb-new {
-  margin: 0 16px 14px;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  font: inherit;
-  font-weight: 650;
-  font-size: 13px;
-  box-shadow: 0 10px 24px rgba(49, 88, 255, 0.22);
-}
-
-.sb-new:hover { background: var(--accent-hover); }
-
 .sb-nav {
   flex: 1;
   overflow-y: auto;
@@ -285,19 +266,10 @@ button:disabled { cursor: not-allowed; }
 [data-theme="dark"] .topbar { background: rgba(21, 25, 34, 0.86); }
 
 .mobile-title { display: none; }
-.crumbs {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 14px;
-  color: var(--fg-3);
+.tb-spacer {
   flex: 1;
   min-width: 0;
 }
-.crumbs .c { padding: 3px 6px; border-radius: 7px; white-space: nowrap; }
-.crumbs .c:hover { background: var(--surface-1); }
-.crumbs .c.cur { color: var(--fg); font-weight: 750; }
-.crumbs .sep { color: var(--fg-4); }
 
 .tb-search {
   width: 260px;
@@ -575,7 +547,6 @@ button:disabled { cursor: not-allowed; }
   }
 
   .sb-brand,
-  .sb-new,
   .sb-foot,
   .sb-group .gt {
     display: none;
@@ -632,13 +603,6 @@ button:disabled { cursor: not-allowed; }
     font-size: 15px;
     font-weight: 800;
     color: var(--fg);
-  }
-
-  .crumbs {
-    flex: 1;
-    min-width: 0;
-    opacity: 0;
-    pointer-events: none;
   }
 
   .tb-search {
