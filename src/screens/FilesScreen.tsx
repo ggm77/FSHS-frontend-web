@@ -604,24 +604,28 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             <Icon name="upload" size={16} color="var(--accent-fg)" />
             <span className="upload-btn-label">{uploading ? '업로드 중...' : '업로드'}</span>
           </button>
-          <div style={{ position: 'relative' }}>
-            <button className="btn" onClick={() => { setShowNewFolder(v => !v); setNewFolderName('새 폴더'); }}>
-              <Icon name="plus" size={15} /> 새 폴더
-            </button>
-            {showNewFolder && (
-              <div style={{ position: 'absolute', top: 44, left: 0, zIndex: 20, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, boxShadow: 'var(--shadow-md)', display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={() => { setShowNewFolder(v => !v); setNewFolderName('새 폴더'); }}>
+            <Icon name="plus" size={15} /> 새 폴더
+          </button>
+          {showNewFolder && (
+            <>
+              <div className="new-folder-backdrop" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} />
+              <div className="new-folder-popup">
+                <div className="new-folder-title">새 폴더</div>
                 <input
+                  className="new-folder-input"
                   value={newFolderName}
                   onChange={e => setNewFolderName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
                   autoFocus
-                  style={{ border: '1px solid var(--border)', borderRadius: 7, padding: '4px 10px', font: 'inherit', background: 'var(--bg)', color: 'var(--fg)', outline: 'none' }}
                 />
-                <button className="btn primary" style={{ height: 32 }} onClick={handleCreateFolder} disabled={creatingFolder}>만들기</button>
-                <button className="btn" style={{ height: 32 }} onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>취소</button>
+                <div className="new-folder-actions">
+                  <button className="btn" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>취소</button>
+                  <button className="btn primary" onClick={handleCreateFolder} disabled={creatingFolder}>만들기</button>
+                </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
           <div className="spacer" />
           <div className="sort-controls" aria-label="파일 정렬">
             <span className="sort-label">정렬</span>
@@ -987,6 +991,34 @@ const filesStyles = `
     padding:0 0 14px;
   }
   .files-toolbar .spacer{ flex:1; }
+  .new-folder-backdrop{
+    position:fixed; inset:0; z-index:40;
+  }
+  .new-folder-popup{
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    z-index:41;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px;
+    box-shadow:var(--shadow-lg);
+    display:flex; flex-direction:column; gap:12px;
+    width:min(320px, calc(100vw - 32px));
+  }
+  .new-folder-title{
+    font-size:15px; font-weight:600; color:var(--fg);
+  }
+  .new-folder-input{
+    border:1px solid var(--border); border-radius:8px;
+    padding:8px 12px; font:inherit; font-size:15px;
+    background:var(--bg-2,var(--bg)); color:var(--fg); outline:none;
+    width:100%; box-sizing:border-box;
+  }
+  .new-folder-input:focus{ border-color:var(--accent); }
+  .new-folder-actions{
+    display:flex; gap:8px; justify-content:flex-end;
+  }
   .sort-controls{
     display:flex; align-items:center; gap:8px;
   }
