@@ -156,7 +156,7 @@ function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
 export default function App() {
   const [authed, setAuthed] = useState(() => loadCachedUser() !== null);
   const [screen, setScreen] = useState<Screen>('files');
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
   const [loginRoute, setLoginRoute] = useState(() => isLoginRoute(window.location.pathname));
@@ -166,6 +166,7 @@ export default function App() {
 
   useEffect(() => {
     document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
   }, [dark]);
 
   useEffect(() => {

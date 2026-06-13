@@ -271,6 +271,7 @@ button:disabled { cursor: not-allowed; }
 }
 
 [data-theme="dark"] .topbar { background: rgba(21, 25, 34, 0.86); }
+[data-theme="dark"] .sidebar { box-shadow: none; }
 
 .mobile-title { display: none; }
 .tb-spacer {
