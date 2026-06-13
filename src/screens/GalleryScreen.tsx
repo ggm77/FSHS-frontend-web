@@ -18,7 +18,7 @@ interface DayGroup {
 function groupByDate(files: FileResponseDto[]): DayGroup[] {
   const map = new Map<string, FileResponseDto[]>();
   files.forEach(f => {
-    const date = (f.capturedAt || f.createdAt).slice(0, 10);
+    const date = f.originUpdatedAt.slice(0, 10);
     const label = new Date(date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
     if (!map.has(label)) map.set(label, []);
     map.get(label)!.push(f);
@@ -55,7 +55,7 @@ export function GalleryScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) 
         folder.folders.map(sf => getFolder(sf.id).then(sf2 => sf2.files.filter(f => f.category === 'IMAGE' || f.category === 'VIDEO')).catch(() => [] as FileResponseDto[]))
       );
       const all = [...mediaFiles, ...subResults.flat()].sort(
-        (a, b) => new Date(b.capturedAt || b.createdAt).getTime() - new Date(a.capturedAt || a.createdAt).getTime()
+        (a, b) => new Date(b.originUpdatedAt).getTime() - new Date(a.originUpdatedAt).getTime()
       );
       setDays(groupByDate(all));
     } finally {
@@ -117,16 +117,17 @@ export function GalleryScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) 
                   className="gphoto"
                   style={{ background: 'var(--surface-2)', position: 'relative', overflow: 'hidden' }}
                   onClick={() => f.category === 'VIDEO' ? onOpenVideo(f.id, f) : onOpenFile(f.id)}>
-                  {f.category === 'IMAGE' ? (
-                    <img
-                      src={getFileThumbnailUrl(f.uuid)}
-                      alt={f.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #2a2730, #19171d)' }}>
-                      <Icon name="play" size={28} color="#fff" />
+                  <img
+                    src={getFileThumbnailUrl(f.uuid)}
+                    alt={f.name}
+                    className="gphoto-img"
+                    loading="lazy"
+                  />
+                  {f.category === 'VIDEO' && (
+                    <div className="video-play-overlay">
+                      <div className="play-circle">
+                        <Icon name="play" size={22} color="#fff" />
+                      </div>
                     </div>
                   )}
                   {f.category === 'VIDEO' && f.duration != null && (
@@ -172,6 +173,26 @@ const galleryStyles = `
     border-radius:10px;
     overflow:hidden;
     cursor:pointer;
+  }
+  .gphoto .gphoto-img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .gphoto .video-play-overlay{
+    position:absolute; inset:0;
+    display:grid; place-items:center;
+    background:linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.18));
+    pointer-events:none;
+  }
+  .gphoto .play-circle{
+    width:44px; height:44px;
+    border-radius:999px;
+    display:grid; place-items:center;
+    background:rgba(0,0,0,0.46);
+    backdrop-filter:blur(8px);
+    box-shadow:0 6px 18px rgba(0,0,0,0.24);
   }
   .gphoto .badge-vid{
     position:absolute; bottom:8px; right:8px;

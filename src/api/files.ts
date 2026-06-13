@@ -65,7 +65,7 @@ export function getFileContentUrl(fileId: number, download: boolean): string {
 }
 
 export function getFileThumbnailUrl(fileUuid: string): string {
-  return `/api/v2/file/${encodeURIComponent(fileUuid)}/thubnail`;
+  return `/api/v2/files/${encodeURIComponent(fileUuid)}/thumbnail`;
 }
 
 export function downloadFileContent(

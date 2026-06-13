@@ -21,6 +21,21 @@ type Screen = 'files' | 'gallery' | 'search' | 'sync' | 'share' | 'users' | 'set
 // 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
 // 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
 type MediaRoute = { type: 'video' | 'viewer'; fileId: number } | null;
+const LOGIN_PATH = '/login';
+
+function isLoginRoute(pathname: string): boolean {
+  return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
+}
+
+function getCurrentLocationPath(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function getHistoryRedirectTo(): string {
+  const state = window.history.state as { redirectTo?: unknown } | null;
+  const redirectTo = typeof state?.redirectTo === 'string' ? state.redirectTo : '/';
+  return isLoginRoute(redirectTo.split(/[?#]/, 1)[0]) ? '/' : redirectTo;
+}
 
 function parseMediaRoute(pathname: string): MediaRoute {
   const m = pathname.match(/^\/(video|viewer)\/(\d+)\/?$/);
@@ -146,6 +161,7 @@ export default function App() {
   const [dark, setDark] = useState(false);
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
+  const [loginRoute, setLoginRoute] = useState(() => isLoginRoute(window.location.pathname));
   // 목록에서 이미 받아 둔 파일 정보. 비디오 페이지가 메타데이터 재요청 없이 바로 재생을 시작하게 해준다.
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -157,12 +173,23 @@ export default function App() {
   useEffect(() => {
     // Initialize history state on mount
     if (!window.history.state) {
-      window.history.replaceState({ screen: 'files' }, '');
+      window.history.replaceState(
+        loginRoute ? { screen: 'login', redirectTo: '/' } : { screen: 'files' },
+        '',
+      );
     }
 
     // 주소(경로)와 history state를 화면에 동기화한다.
     // 경로가 미디어 라우트면 하위 페이지를 띄우고, 아니면 항목에 기록된 메인 화면을 복원한다.
     const syncFromLocation = () => {
+      const isLogin = isLoginRoute(window.location.pathname);
+      setLoginRoute(isLogin);
+      if (isLogin) {
+        setMediaRoute(null);
+        setVideoFile(null);
+        return;
+      }
+
       const route = parseMediaRoute(window.location.pathname);
       setMediaRoute(route);
       if (!route) {
@@ -180,7 +207,26 @@ export default function App() {
     // 미디어 하위 페이지 진입/이탈(뒤로·앞으로)과 폴더 탐색 항목 이동 모두 popstate로 돌아온다.
     window.addEventListener('popstate', syncFromLocation);
     return () => window.removeEventListener('popstate', syncFromLocation);
-  }, []);
+  }, [loginRoute]);
+
+  useEffect(() => {
+    const isLogin = isLoginRoute(window.location.pathname);
+
+    if (authed) {
+      if (!isLogin) return;
+
+      const target = getHistoryRedirectTo();
+      window.history.replaceState({ screen: 'files' }, '', target);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
+
+    if (isLogin) return;
+
+    const redirectTo = getCurrentLocationPath();
+    window.history.replaceState({ screen: 'login', redirectTo }, '', LOGIN_PATH);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [authed]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -255,6 +301,11 @@ export default function App() {
     setAuthed(false);
     setUser(null);
     localStorage.removeItem('user');
+    setLoginRoute(true);
+    setMediaRoute(null);
+    setVideoFile(null);
+    setSidebarOpen(false);
+    window.history.replaceState({ screen: 'login', redirectTo: '/' }, '', LOGIN_PATH);
   }
 
   function handleNav(id: string) {
@@ -264,10 +315,11 @@ export default function App() {
     setSidebarOpen(false);
   }
 
-  // 미디어 하위 페이지로 이동한다. 떠나기 전에 현재 화면 이름을 현재 항목에 기록해 두어
-  // 뒤로가기로 돌아왔을 때 보던 화면(폴더 위치 포함)이 복원되게 한다.
+  // 미디어 하위 페이지로 이동한다. 떠나기 전에 현재 화면 이름을 현재 항목에 기록해 둔다.
   function openMediaPage(path: string) {
-    window.history.replaceState({ ...(window.history.state || {}), screen }, '');
+    const currentState = { ...((window.history.state || {}) as Record<string, unknown>) };
+    delete currentState.path;
+    window.history.replaceState({ ...currentState, screen }, '');
     // fromApp: 앱 내부에서 진입했다는 표시(뒤로가기 처리용).
     // pushState는 popstate를 발생시키지 않으므로 라우트 상태를 직접 갱신한다.
     window.history.pushState({ fromApp: true }, '', path);
@@ -296,6 +348,10 @@ export default function App() {
 
   if (!authed) {
     return <LoginScreen onSignIn={handleSignIn} />;
+  }
+
+  if (loginRoute) {
+    return null;
   }
 
   if (mediaRoute?.type === 'video') {

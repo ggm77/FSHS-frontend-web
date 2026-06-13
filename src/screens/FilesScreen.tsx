@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent } from '../api/files';
@@ -25,6 +25,16 @@ interface BreadcrumbItem {
 
 type FolderPathItem = { id: number; name: string };
 type HistoryMode = 'push' | 'replace' | 'none';
+type FileSortKey = 'name' | 'originUpdatedAt' | 'size';
+type SortDirection = 'asc' | 'desc';
+type SortableFileItem = Pick<SimpleFolderResponseDto, 'id' | 'name' | 'originUpdatedAt'> & {
+  size?: number;
+};
+
+const WINDOWS_NAME_COLLATOR = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 function getFolderIdFromHash(): number | null {
   let hash = '';
@@ -73,6 +83,48 @@ function formatDate(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
+function getOriginUpdatedTime(item: SortableFileItem): number {
+  const time = Date.parse(item.originUpdatedAt);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function getSortSize(item: SortableFileItem): number | null {
+  return typeof item.size === 'number' ? item.size : null;
+}
+
+function compareSortableItems(
+  a: SortableFileItem,
+  b: SortableFileItem,
+  sortKey: FileSortKey,
+  direction: SortDirection,
+): number {
+  let primary = 0;
+
+  if (sortKey === 'name') {
+    primary = WINDOWS_NAME_COLLATOR.compare(a.name, b.name);
+  } else if (sortKey === 'originUpdatedAt') {
+    primary = getOriginUpdatedTime(a) - getOriginUpdatedTime(b);
+  } else {
+    const aSize = getSortSize(a);
+    const bSize = getSortSize(b);
+    primary = aSize != null && bSize != null ? aSize - bSize : 0;
+  }
+
+  if (primary !== 0) return direction === 'asc' ? primary : -primary;
+
+  const byName = WINDOWS_NAME_COLLATOR.compare(a.name, b.name);
+  if (byName !== 0) return byName;
+  return a.id - b.id;
+}
+
+function sortFileItems<T extends SortableFileItem>(
+  items: T[],
+  sortKey: FileSortKey,
+  direction: SortDirection,
+): T[] {
+  return [...items].sort((a, b) => compareSortableItems(a, b, sortKey, direction));
+}
+
 function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
@@ -81,6 +133,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<FolderPathItem[]>([]);
   const [view, setView] = useState<'list' | 'grid'>('list');
+  const [sortKey, setSortKey] = useState<FileSortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -117,13 +171,21 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
   const downloadingKey = downloadState?.key ?? null;
+  const sortedFolders = useMemo(
+    () => folder ? sortFileItems(folder.folders, sortKey, sortDirection) : [],
+    [folder, sortDirection, sortKey],
+  );
+  const sortedFiles = useMemo(
+    () => folder ? sortFileItems(folder.files, sortKey, sortDirection) : [],
+    [folder, sortDirection, sortKey],
+  );
 
-  const syncFolderHistory = useCallback((folderId: number, nextPath: FolderPathItem[], mode: HistoryMode) => {
+  const syncFolderHistory = useCallback((folderId: number, mode: HistoryMode) => {
     if (mode === 'none') return;
 
     const state = folderId === rootFolderId
       ? { screen: 'files' }
-      : { type: 'folder', screen: 'files', folderId, path: nextPath };
+      : { type: 'folder', screen: 'files', folderId };
     const url = getFolderHashUrl(folderId, rootFolderId);
 
     if (mode === 'push') {
@@ -184,11 +246,11 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     try {
       const nextPath = await buildPathToFolder(data);
       setPath(nextPath);
-      syncFolderHistory(data.id, nextPath, historyMode);
+      syncFolderHistory(data.id, historyMode);
     } catch {
       const nextPath = data.id === rootFolderId || data.isRoot ? [] : [{ id: data.id, name: data.name }];
       setPath(nextPath);
-      syncFolderHistory(data.id, nextPath, historyMode);
+      syncFolderHistory(data.id, historyMode);
     }
   }, [buildPathToFolder, loadFolder, rootFolderId, syncFolderHistory]);
 
@@ -215,20 +277,20 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     const newPath = [...path, { id: f.id, name: f.name }];
     setPath(newPath);
     loadFolder(f.id);
-    syncFolderHistory(f.id, newPath, 'push');
+    syncFolderHistory(f.id, 'push');
   }
 
   function navigateBreadcrumb(idx: number) {
     if (idx < 0) {
       setPath([]);
       loadFolder(rootFolderId!);
-      syncFolderHistory(rootFolderId!, [], 'push');
+      syncFolderHistory(rootFolderId!, 'push');
     } else {
       const newPath = path.slice(0, idx + 1);
       const target = newPath[idx];
       setPath(newPath);
       loadFolder(target.id);
-      syncFolderHistory(target.id, newPath, 'push');
+      syncFolderHistory(target.id, 'push');
     }
   }
 
@@ -442,6 +504,15 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
+  function handleSortKeyChange(nextSortKey: FileSortKey) {
+    setSortKey(nextSortKey);
+    setSortDirection(nextSortKey === 'name' ? 'asc' : 'desc');
+  }
+
+  function toggleSortDirection() {
+    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+  }
+
   const crumbItems: BreadcrumbItem[] = [
     { label: '내 보관함', onClick: () => navigateBreadcrumb(-1) },
     ...path.map((p, i) => ({ label: p.name, onClick: () => navigateBreadcrumb(i) })),
@@ -495,7 +566,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => handleUpload(e.target.files)} />
           <button className="btn primary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
             <Icon name="upload" size={16} color="var(--accent-fg)" />
-            {uploading ? '업로드 중...' : '업로드'}
+            <span className="upload-btn-label">{uploading ? '업로드 중...' : '업로드'}</span>
           </button>
           <div style={{ position: 'relative' }}>
             <button className="btn" onClick={() => { setShowNewFolder(v => !v); setNewFolderName('새 폴더'); }}>
@@ -516,6 +587,32 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             )}
           </div>
           <div className="spacer" />
+          <div className="sort-controls" aria-label="파일 정렬">
+            <span className="sort-label">정렬</span>
+            <div className="seg">
+              <button className={sortKey === 'name' ? 'on' : ''} onClick={() => handleSortKeyChange('name')}>이름순</button>
+              <button className={sortKey === 'originUpdatedAt' ? 'on' : ''} onClick={() => handleSortKeyChange('originUpdatedAt')}>수정일순</button>
+              <button className={sortKey === 'size' ? 'on' : ''} onClick={() => handleSortKeyChange('size')}>크기순</button>
+            </div>
+            <select
+              className="sort-select"
+              value={sortKey}
+              onChange={e => handleSortKeyChange(e.target.value as FileSortKey)}
+              aria-label="정렬 기준"
+            >
+              <option value="name">이름순</option>
+              <option value="originUpdatedAt">수정일순</option>
+              <option value="size">크기순</option>
+            </select>
+            <button
+              className="sort-dir-btn"
+              title={sortDirection === 'asc' ? '오름차순' : '내림차순'}
+              onClick={toggleSortDirection}
+            >
+              <Icon name={sortDirection === 'asc' ? 'chevronU' : 'chevronD'} size={13} />
+              {sortDirection === 'asc' ? '오름차순' : '내림차순'}
+            </button>
+          </div>
           <div className="view-toggle">
             <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}><Icon name="list" size={18} /></button>
             <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}><Icon name="grid" size={16} /></button>
@@ -539,7 +636,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                     <div />
                   </div>
                   {/* Folders first */}
-                  {folder.folders.map((f) => (
+                  {sortedFolders.map((f) => (
                     <div key={`folder-${f.id}`}
                       className="file-row"
                       onClick={() => navigateTo(f)}>
@@ -566,7 +663,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                     </div>
                   ))}
                   {/* Files next */}
-                  {folder.files.map((f) => (
+                  {sortedFiles.map((f) => (
                     <div key={`file-${f.id}`}
                       className={'file-row' + (selected === f.id ? ' selected' : '')}
                       onClick={() => {
@@ -603,7 +700,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
               ) : (
                 <div className="file-grid">
                   {/* Folders first */}
-                  {folder.folders.map((f) => (
+                  {sortedFolders.map((f) => (
                     <div className="grid-card" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
                       <div className="gc-head">
                         <Icon name="folder" size={18} color="var(--c-folder)" stroke={1.7} />
@@ -626,7 +723,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                     </div>
                   ))}
                   {/* Files next */}
-                  {folder.files.map((f) => (
+                  {sortedFiles.map((f) => (
                     <div className="grid-card" key={`file-${f.id}`}
                       onClick={() => {
                         if (f.category === 'VIDEO') onOpenVideo(f.id, f);
@@ -839,10 +936,36 @@ const filesStyles = `
     overflow-x:auto;
   }
   .files-toolbar{
-    display:flex; align-items:center; gap:8px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     padding:0 0 14px;
   }
   .files-toolbar .spacer{ flex:1; }
+  .sort-controls{
+    display:flex; align-items:center; gap:8px;
+  }
+  .sort-label{
+    font-size:12px;
+    font-weight:750;
+    color:var(--fg-3);
+  }
+  .sort-select{
+    display:none;
+  }
+  .sort-dir-btn{
+    height:32px;
+    display:flex; align-items:center; gap:5px;
+    padding:0 10px;
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    background:var(--bg);
+    color:var(--fg-2);
+    font-size:12px;
+    font-weight:650;
+  }
+  .sort-dir-btn:hover{
+    background:var(--surface-1);
+    color:var(--accent);
+  }
 
   .folder-grid{
     display:grid;
@@ -910,6 +1033,58 @@ const filesStyles = `
   .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .grid-card .gc-prev{ height:124px; margin:0 12px 12px; border-radius:8px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
+
+  @media (max-width: 768px) {
+    .files-toolbar .spacer{
+      flex:0 0 0;
+      width:0;
+    }
+    .sort-controls{
+      flex:0 0 auto;
+      min-width:0;
+    }
+    .sort-label{
+      display:none;
+    }
+    .sort-controls .seg{
+      display:none;
+    }
+    .sort-select{
+      display:block;
+      flex:1 1 0;
+      min-width:0;
+      max-width:220px;
+      height:32px;
+      padding:0 30px 0 10px;
+      border:1px solid var(--border-soft);
+      border-radius:8px;
+      background:var(--bg);
+      color:var(--fg-2);
+      font:inherit;
+      font-size:12px;
+      font-weight:650;
+      outline:none;
+    }
+    .files-toolbar > .btn.primary{
+      width:32px;
+      min-width:32px;
+      padding:0;
+      justify-content:center;
+    }
+    .files-toolbar > .btn.primary .upload-btn-label{
+      display:none;
+    }
+    .sort-dir-btn{
+      flex-shrink:0;
+    }
+    .files-toolbar{
+      flex-wrap:nowrap;
+      overflow-x:auto;
+    }
+    .files-toolbar > *{
+      flex-shrink:0;
+    }
+  }
 
   .upload-status-widget {
     position: fixed;
