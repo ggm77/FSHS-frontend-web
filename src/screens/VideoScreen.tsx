@@ -923,6 +923,47 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     return () => document.removeEventListener('pointerdown', onDocPointerDown);
   }, [showSettings]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      const v = videoRef.current;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        playRequestedRef.current = !playing;
+        if (playing) {
+          v?.pause();
+        } else if (prebufferingRef.current) {
+          setWaiting(true);
+        } else {
+          v?.play().catch((err) => {
+            console.warn('Play failed:', err);
+            playRequestedRef.current = false;
+            setPlaying(false);
+            setWaiting(false);
+          });
+        }
+        setPlaying(!playing);
+      } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        const delta = e.code === 'ArrowLeft' ? -5 : 5;
+        if (reloadSeek) {
+          const newTime = Math.max(0, Math.min(currentTime + delta, duration || currentTime + delta));
+          setStreamStart(newTime);
+          setCurrentTime(newTime);
+          setBuffered(newTime);
+        } else if (v) {
+          v.currentTime = Math.max(0, Math.min(v.currentTime + delta, v.duration || v.currentTime + delta));
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [currentTime, duration, playing, reloadSeek]);
+
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
 
