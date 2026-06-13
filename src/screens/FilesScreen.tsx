@@ -828,7 +828,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         <div className="upload-status-widget">
           <div className="widget-header">
             <span className="title">
-              {uploading ? (
+              {uploading && uploadItems.some(i => i.status === 'UPLOADING') ? (
                 <>
                   <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
                   파일 업로드 중 ({uploadItems.filter(i => i.status !== 'UPLOADING').length + 1}/{uploadItems.length})
