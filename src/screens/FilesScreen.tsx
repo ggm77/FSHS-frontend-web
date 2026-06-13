@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
-import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent } from '../api/files';
+import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
 
@@ -79,6 +79,20 @@ function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number })
     : 'var(--c-doc)';
 
   return <Icon name={iconName} size={size} color={color} stroke={1.7} />;
+}
+
+function FileThumbnail({ file, size = 20 }: { file: FileResponseDto; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const hasThumbnail = file.category === 'IMAGE' || file.category === 'VIDEO';
+  if (!hasThumbnail || failed) return <FileIcon file={file} size={size} />;
+  return (
+    <img
+      src={getFileThumbnailUrl(file.uuid)}
+      alt=""
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function formatDate(iso: string): string {
@@ -706,7 +720,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       }}>
                       <div className="file-name">
                         <div className="file-thumb-sm">
-                          <FileIcon file={f} size={20} />
+                          <FileThumbnail file={f} size={20} />
                         </div>
                         <span className="nm">{f.name}</span>
                         {f.category === 'VIDEO' && f.videoCodec && (
