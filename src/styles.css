@@ -155,6 +155,13 @@ button:disabled { cursor: not-allowed; }
   background: #f4f7ff;
 }
 
+.sb-logo-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .sb-brand .name {
   font-size: 17px;
   font-weight: 750;

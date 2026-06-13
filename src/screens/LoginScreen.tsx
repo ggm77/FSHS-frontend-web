@@ -34,7 +34,7 @@ export function LoginScreen({ onSignIn }: Props) {
       <div className="login-card">
         <div className="login-left">
           <div className="logo">
-            <Icon name="cube" size={48} color="currentColor" stroke={2} />
+            <img src="/logo.png" alt="FSHS" style={{ width: 96, height: 96, objectFit: 'contain' }} />
           </div>
           {mode === 'login' ? (
             <>

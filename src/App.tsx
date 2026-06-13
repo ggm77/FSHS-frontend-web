@@ -87,9 +87,7 @@ function Sidebar({ active, onNav, user, className }: { active: string; onNav: (i
   return (
     <aside className={`sidebar ${className || ''}`}>
       <div className="sb-brand">
-        <div className="logo">
-          <Icon name="cube" size={22} color="currentColor" stroke={2} />
-        </div>
+        <img src="/logo.png" alt="FSHS" className="sb-logo-img" />
         <div>
           <div className="name">FSHS</div>
           <div className="host">fshs2.seohamin.com</div>

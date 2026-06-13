@@ -31,6 +31,12 @@ type SortableFileItem = Pick<SimpleFolderResponseDto, 'id' | 'name' | 'originUpd
   size?: number;
 };
 
+const SORT_OPTIONS: { key: FileSortKey; label: string }[] = [
+  { key: 'name', label: '이름순' },
+  { key: 'originUpdatedAt', label: '수정일순' },
+  { key: 'size', label: '크기순' },
+];
+
 const WINDOWS_NAME_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: 'base',
@@ -167,7 +173,23 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [downloadState, setDownloadState] = useState<DownloadState | null>(null);
   const [error, setError] = useState('');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [sortMenuPos, setSortMenuPos] = useState<{ top: number; right: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const sortBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showSortMenu) return;
+    function handleOutside(e: MouseEvent) {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)
+        && sortBtnRef.current && !sortBtnRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [showSortMenu]);
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
   const downloadingKey = downloadState?.key ?? null;
@@ -504,13 +526,13 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
-  function handleSortKeyChange(nextSortKey: FileSortKey) {
-    setSortKey(nextSortKey);
-    setSortDirection(nextSortKey === 'name' ? 'asc' : 'desc');
-  }
-
-  function toggleSortDirection() {
-    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+  function handleSortOptionClick(key: FileSortKey) {
+    if (key === sortKey) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection(key === 'name' ? 'asc' : 'desc');
+    }
   }
 
   const crumbItems: BreadcrumbItem[] = [
@@ -589,29 +611,40 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           <div className="spacer" />
           <div className="sort-controls" aria-label="파일 정렬">
             <span className="sort-label">정렬</span>
-            <div className="seg">
-              <button className={sortKey === 'name' ? 'on' : ''} onClick={() => handleSortKeyChange('name')}>이름순</button>
-              <button className={sortKey === 'originUpdatedAt' ? 'on' : ''} onClick={() => handleSortKeyChange('originUpdatedAt')}>수정일순</button>
-              <button className={sortKey === 'size' ? 'on' : ''} onClick={() => handleSortKeyChange('size')}>크기순</button>
+            <div className="sort-custom-wrap">
+              <button
+                ref={sortBtnRef}
+                className="sort-custom-btn"
+                onClick={() => {
+                  if (showSortMenu) { setShowSortMenu(false); return; }
+                  const rect = sortBtnRef.current?.getBoundingClientRect();
+                  if (rect) setSortMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                  setShowSortMenu(true);
+                }}
+                aria-label="정렬 기준"
+              >
+                {SORT_OPTIONS.find(o => o.key === sortKey)?.label ?? '정렬'}
+                <Icon name={sortDirection === 'asc' ? 'chevronU' : 'chevronD'} size={11} />
+              </button>
+              {showSortMenu && sortMenuPos && (
+                <div
+                  ref={sortMenuRef}
+                  className="sort-custom-menu"
+                  style={{ top: sortMenuPos.top, right: sortMenuPos.right }}
+                >
+                  {SORT_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      className={`sort-custom-item${opt.key === sortKey ? ' active' : ''}`}
+                      onClick={() => { handleSortOptionClick(opt.key); setShowSortMenu(false); }}
+                    >
+                      {opt.label}
+                      {opt.key === sortKey && <Icon name={sortDirection === 'asc' ? 'chevronU' : 'chevronD'} size={13} />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <select
-              className="sort-select"
-              value={sortKey}
-              onChange={e => handleSortKeyChange(e.target.value as FileSortKey)}
-              aria-label="정렬 기준"
-            >
-              <option value="name">이름순</option>
-              <option value="originUpdatedAt">수정일순</option>
-              <option value="size">크기순</option>
-            </select>
-            <button
-              className="sort-dir-btn"
-              title={sortDirection === 'asc' ? '오름차순' : '내림차순'}
-              onClick={toggleSortDirection}
-            >
-              <Icon name={sortDirection === 'asc' ? 'chevronU' : 'chevronD'} size={13} />
-              {sortDirection === 'asc' ? '오름차순' : '내림차순'}
-            </button>
           </div>
           <div className="view-toggle">
             <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}><Icon name="list" size={18} /></button>
@@ -948,10 +981,11 @@ const filesStyles = `
     font-weight:750;
     color:var(--fg-3);
   }
-  .sort-select{
-    display:none;
+  .sort-custom-wrap{
+    display:block;
+    position:relative;
   }
-  .sort-dir-btn{
+  .sort-custom-btn{
     height:32px;
     display:flex; align-items:center; gap:5px;
     padding:0 10px;
@@ -959,14 +993,37 @@ const filesStyles = `
     border-radius:8px;
     background:var(--bg);
     color:var(--fg-2);
+    font:inherit;
     font-size:12px;
     font-weight:650;
+    white-space:nowrap;
   }
-  .sort-dir-btn:hover{
+  .sort-custom-btn:hover{
     background:var(--surface-1);
     color:var(--accent);
   }
-
+  .sort-custom-menu{
+    position:fixed;
+    background:var(--bg);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    box-shadow:var(--shadow-md);
+    z-index:200;
+    overflow:hidden;
+    min-width:140px;
+  }
+  .sort-custom-item{
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 14px;
+    border:0; background:transparent;
+    font:inherit; font-size:13px; font-weight:600;
+    color:var(--fg-2);
+    text-align:left;
+    cursor:pointer;
+  }
+  .sort-custom-item:hover{ background:var(--surface-1); color:var(--fg); }
+  .sort-custom-item.active{ color:var(--accent); background:var(--accent-soft); }
   .folder-grid{
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(228px, 1fr));
@@ -1046,25 +1103,6 @@ const filesStyles = `
     .sort-label{
       display:none;
     }
-    .sort-controls .seg{
-      display:none;
-    }
-    .sort-select{
-      display:block;
-      flex:1 1 0;
-      min-width:0;
-      max-width:220px;
-      height:32px;
-      padding:0 30px 0 10px;
-      border:1px solid var(--border-soft);
-      border-radius:8px;
-      background:var(--bg);
-      color:var(--fg-2);
-      font:inherit;
-      font-size:12px;
-      font-weight:650;
-      outline:none;
-    }
     .files-toolbar > .btn.primary{
       width:32px;
       min-width:32px;
@@ -1073,9 +1111,6 @@ const filesStyles = `
     }
     .files-toolbar > .btn.primary .upload-btn-label{
       display:none;
-    }
-    .sort-dir-btn{
-      flex-shrink:0;
     }
     .files-toolbar{
       flex-wrap:nowrap;
