@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
+import type { ReactNode } from 'react';
 import './styles.css';
 import { Icon } from './components/Icon';
 import { LoginScreen } from './screens/LoginScreen';
@@ -22,6 +23,11 @@ type Screen = 'files' | 'gallery' | 'search' | 'sync' | 'share' | 'users' | 'set
 // 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
 type MediaRoute = { type: 'video' | 'viewer'; fileId: number } | null;
 const LOGIN_PATH = '/login';
+const LIGHT_THEME_COLOR = '#ffffff';
+const DARK_THEME_COLOR = '#151922';
+const VIDEO_THEME_COLOR = '#10131d';
+const VIEWER_THEME_COLOR = '#0f1015';
+let shellChromeUpdateId = 0;
 
 function isLoginRoute(pathname: string): boolean {
   return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
@@ -40,6 +46,86 @@ function getHistoryRedirectTo(): string {
 function parseMediaRoute(pathname: string): MediaRoute {
   const m = pathname.match(/^\/(video|viewer)\/(\d+)\/?$/);
   return m ? { type: m[1] as 'video' | 'viewer', fileId: Number(m[2]) } : null;
+}
+
+function setMetaContent(name: string, content: string) {
+  let meta = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = name;
+    document.head.appendChild(meta);
+  }
+  meta.content = content;
+}
+
+function getBaseThemeColor(dark: boolean): string {
+  return dark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+}
+
+function getMediaThemeColor(type: NonNullable<MediaRoute>['type']): string {
+  return type === 'video' ? VIDEO_THEME_COLOR : VIEWER_THEME_COLOR;
+}
+
+function applyShellChrome(
+  color: string,
+  routeType: NonNullable<MediaRoute>['type'] | null,
+  repeat = false,
+) {
+  const updateId = ++shellChromeUpdateId;
+
+  const commit = () => {
+    if (updateId !== shellChromeUpdateId) return;
+
+    const root = document.getElementById('root');
+    document.documentElement.style.backgroundColor = color;
+    document.body.style.backgroundColor = color;
+    document.documentElement.style.colorScheme = routeType || color === DARK_THEME_COLOR ? 'dark' : 'light';
+    if (root) root.style.backgroundColor = color;
+
+    if (routeType) {
+      document.documentElement.dataset.mediaRoute = routeType;
+      document.body.dataset.mediaRoute = routeType;
+    } else {
+      delete document.documentElement.dataset.mediaRoute;
+      delete document.body.dataset.mediaRoute;
+    }
+
+    setMetaContent('theme-color', color);
+    setMetaContent(
+      'apple-mobile-web-app-status-bar-style',
+      routeType || color === DARK_THEME_COLOR ? 'black-translucent' : 'default',
+    );
+  };
+
+  commit();
+  if (!repeat) return;
+
+  window.requestAnimationFrame(commit);
+  window.setTimeout(commit, 80);
+  window.setTimeout(commit, 250);
+}
+
+function MediaShell({
+  type,
+  dark,
+  children,
+}: {
+  type: NonNullable<MediaRoute>['type'];
+  dark: boolean;
+  children: ReactNode;
+}) {
+  const color = getMediaThemeColor(type);
+
+  useLayoutEffect(() => {
+    applyShellChrome(color, type, true);
+    return () => applyShellChrome(getBaseThemeColor(dark), null, true);
+  }, [color, dark, type]);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: color }}>
+      {children}
+    </div>
+  );
 }
 
 // localStorage에 캐시된 사용자 정보를 안전하게 읽는다.
@@ -168,6 +254,11 @@ export default function App() {
     document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
     localStorage.setItem('theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  useLayoutEffect(() => {
+    if (mediaRoute) return;
+    applyShellChrome(getBaseThemeColor(dark), null, true);
+  }, [dark, mediaRoute]);
 
   useEffect(() => {
     // Initialize history state on mount
@@ -355,17 +446,17 @@ export default function App() {
 
   if (mediaRoute?.type === 'video') {
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#000' }}>
+      <MediaShell type="video" dark={dark}>
         <VideoScreen fileId={mediaRoute.fileId} initialFile={videoFile} onBack={handleBack} />
-      </div>
+      </MediaShell>
     );
   }
 
   if (mediaRoute?.type === 'viewer') {
     return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 5, background: '#0f1015' }}>
+      <MediaShell type="viewer" dark={dark}>
         <ViewerScreen fileId={mediaRoute.fileId} onBack={handleBack} />
-      </div>
+      </MediaShell>
     );
   }
 

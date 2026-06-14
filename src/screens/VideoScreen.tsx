@@ -20,6 +20,72 @@ interface Props {
   onBack: () => void;
 }
 
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+type WebKitVideoElement = HTMLVideoElement & {
+  webkitDisplayingFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+  webkitEnterFullScreen?: () => void;
+  webkitExitFullscreen?: () => void;
+  webkitExitFullScreen?: () => void;
+};
+
+function getDocumentFullscreenElement(): Element | null {
+  if (typeof document === 'undefined') return null;
+  const doc = document as FullscreenDocument;
+  return document.fullscreenElement || doc.webkitFullscreenElement || null;
+}
+
+function requestDocumentFullscreen(el: FullscreenElement): Promise<void> | void {
+  if (el.requestFullscreen) return el.requestFullscreen();
+  return el.webkitRequestFullscreen?.();
+}
+
+function exitDocumentFullscreen(): Promise<void> | void {
+  const doc = document as FullscreenDocument;
+  if (document.exitFullscreen) return document.exitFullscreen();
+  return doc.webkitExitFullscreen?.();
+}
+
+function isNativeVideoFullscreen(video: HTMLVideoElement | null): boolean {
+  return !!(video as WebKitVideoElement | null)?.webkitDisplayingFullscreen;
+}
+
+function enterNativeVideoFullscreen(video: HTMLVideoElement | null): boolean {
+  const webkitVideo = video as WebKitVideoElement | null;
+  const enterFullscreen = webkitVideo?.webkitEnterFullscreen || webkitVideo?.webkitEnterFullScreen;
+  if (!webkitVideo || !enterFullscreen) return false;
+
+  try {
+    enterFullscreen.call(webkitVideo);
+    return true;
+  } catch (err) {
+    console.error('Failed to enter native video fullscreen:', err);
+    return false;
+  }
+}
+
+function exitNativeVideoFullscreen(video: HTMLVideoElement | null): boolean {
+  const webkitVideo = video as WebKitVideoElement | null;
+  const exitFullscreen = webkitVideo?.webkitExitFullscreen || webkitVideo?.webkitExitFullScreen;
+  if (!webkitVideo || !exitFullscreen) return false;
+
+  try {
+    exitFullscreen.call(webkitVideo);
+    return true;
+  } catch (err) {
+    console.error('Failed to exit native video fullscreen:', err);
+    return false;
+  }
+}
+
 function formatTime(secs: number): string {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
@@ -36,16 +102,22 @@ function normalizeDuration(duration?: number | null): number {
 // 사파리/iOS(아이폰·아이패드)는 모든 브라우저가 WebKit이라 <video>에 Range(206)를 강하게 요구합니다.
 // 이런 환경에서는 라이브 트랜스코딩(/stream: 200 응답, Range 미지원)이 재생되지 않으므로,
 // 사파리가 네이티브로 디코딩 가능한 코덱/컨테이너는 /content(원본 + Range)로 직접 재생시킵니다.
+function isAppleTouchWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /iP(hone|ad|od)/.test(ua) ||
+    // iPadOS 13+는 데스크톱 맥으로 위장하므로 터치 포인트 수로 구분
+    (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+}
+
 function isAppleWebKit(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
-  const iOS = /iP(hone|ad|od)/.test(ua) ||
-    // iPadOS 13+는 데스크톱 맥으로 위장하므로 터치 포인트 수로 구분
-    (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
   const macSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua);
-  return iOS || macSafari;
+  return isAppleTouchWebKit() || macSafari;
 }
 
+const APPLE_TOUCH_WEBKIT = isAppleTouchWebKit();
 const APPLE_WEBKIT = isAppleWebKit();
 
 function canPlayMediaType(mediaType: string): boolean {
@@ -542,18 +614,24 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   const [streamStart, setStreamStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [userActive, setUserActive] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeTimeoutRef = useRef<number | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const resumeAtRef = useRef<number | null>(null);
   const prebufferingRef = useRef(false);
   const prebufferRunRef = useRef(0);
   const playRequestedRef = useRef(true);
+
+  const setVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    setVideoElement(node);
+  }, []);
 
   // 실제 트랜스코딩 사용 여부: 수동 선택이 있으면 그것을, 없으면 자동 판별값을 따릅니다.
   const useTranscode = forcedMode ? forcedMode === 'stream' : autoStream;
@@ -574,13 +652,37 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!getDocumentFullscreenElement() || isNativeVideoFullscreen(videoElement));
     };
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    const video = videoElement;
+    video?.addEventListener('webkitbeginfullscreen', handleFullscreenChange);
+    video?.addEventListener('webkitendfullscreen', handleFullscreenChange);
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      video?.removeEventListener('webkitbeginfullscreen', handleFullscreenChange);
+      video?.removeEventListener('webkitendfullscreen', handleFullscreenChange);
     };
+  }, [videoElement]);
+
+  useEffect(() => () => {
+    if (activeTimeoutRef.current) window.clearTimeout(activeTimeoutRef.current);
+  }, []);
+
+  useEffect(() => () => {
+    const video = videoRef.current;
+    if (getDocumentFullscreenElement()) {
+      Promise.resolve(exitDocumentFullscreen()).catch((err) => {
+        console.error('Failed to exit fullscreen:', err);
+      });
+    }
+    if (isNativeVideoFullscreen(video)) {
+      exitNativeVideoFullscreen(video);
+    }
   }, []);
 
   useEffect(() => {
@@ -597,13 +699,38 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
   function toggleFullscreen() {
     const el = containerRef.current;
+    const video = videoRef.current;
     if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().catch((err) => {
-        console.error('Failed to enter fullscreen:', err);
+
+    if (getDocumentFullscreenElement()) {
+      Promise.resolve(exitDocumentFullscreen()).catch((err) => {
+        console.error('Failed to exit fullscreen:', err);
       });
-    } else {
-      document.exitFullscreen();
+      return;
+    }
+
+    if (isNativeVideoFullscreen(video)) {
+      exitNativeVideoFullscreen(video);
+      return;
+    }
+
+    if (APPLE_TOUCH_WEBKIT && enterNativeVideoFullscreen(video)) {
+      setIsFullscreen(true);
+      return;
+    }
+
+    const fullscreenRequest = requestDocumentFullscreen(el);
+    if (fullscreenRequest) {
+      Promise.resolve(fullscreenRequest).catch((err) => {
+        if (!enterNativeVideoFullscreen(video)) {
+          console.error('Failed to enter fullscreen:', err);
+        }
+      });
+      return;
+    }
+
+    if (!enterNativeVideoFullscreen(video)) {
+      console.error('Failed to enter fullscreen: fullscreen API is not available.');
     }
   }
 
@@ -986,10 +1113,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       <div className="video-stage">
         {videoSrc ? (
           <video
-            ref={videoRef}
+            ref={setVideoNode}
+            className="video-el"
             playsInline
             preload="auto"
-            style={{ width: '80%', maxWidth: 1080, borderRadius: 16, aspectRatio: '16/9', objectFit: 'contain', background: '#000', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
               const v = videoRef.current;
@@ -1116,62 +1243,66 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
           <div className="knob" style={{ left: pct + '%' }} />
         </div>
         <div className="player-row">
-          <span className="time">{formatTime(currentTime)}</span>
-          <div className="stretch" />
-          <button className="pbtn" onClick={() => { if (videoRef.current) videoRef.current.currentTime -= 10; }}>
-            <Icon name="prev" size={18} stroke={1.5} color="#fff" />
-          </button>
-          <button className="pbtn play" onClick={togglePlay}>
-            <Icon name={playing ? 'pause' : 'play'} size={18} color="#000" stroke={1.5} />
-          </button>
-          <button className="pbtn" onClick={() => { if (videoRef.current) videoRef.current.currentTime += 10; }}>
-            <Icon name="next" size={18} stroke={1.5} color="#fff" />
-          </button>
-          <div className="stretch" />
-          <button className="pbtn" title="볼륨" onClick={() => {
-            const v = videoRef.current;
-            if (v) v.muted = !v.muted;
-          }}>
-            <Icon name="volume" size={16} stroke={1.5} color="#fff" />
-          </button>
-          <div className="settings-wrap" ref={settingsRef}>
-            <button
-              className={`pbtn${showSettings ? ' active' : ''}`}
-              title="재생 방식"
-              onClick={() => setShowSettings((s) => !s)}
-            >
-              <Icon name="settings" size={16} stroke={1.5} color="#fff" />
-            </button>
-            {showSettings && (
-              <div className="settings-menu">
-                <div className="settings-head">재생 방식</div>
-                <button
-                  className={`settings-item${!useTranscode ? ' active' : ''}`}
-                  onClick={() => selectMode('content')}
-                >
-                  <div className="si-main">
-                    <span className="si-title">일반 재생</span>
-                    <span className="si-desc">원본 그대로 전송 · 빠름</span>
-                  </div>
-                  {!useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
-                </button>
-                <button
-                  className={`settings-item${useTranscode ? ' active' : ''}`}
-                  onClick={() => selectMode('stream')}
-                >
-                  <div className="si-main">
-                    <span className="si-title">실시간 트랜스코딩</span>
-                    <span className="si-desc">서버 슬롯 사용 · H.264 변환</span>
-                  </div>
-                  {useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
-                </button>
-              </div>
-            )}
+          <div className="player-time">
+            <span className="time">{formatTime(currentTime)}</span>
           </div>
-          <button className="pbtn" title={isFullscreen ? '전체화면 종료' : '전체화면'} onClick={toggleFullscreen}>
-            <Icon name="fullscreen" size={16} stroke={1.5} color="#fff" />
-          </button>
-          <span className="time" style={{ textAlign: 'right' }}>{formatTime(duration)}</span>
+          <div className="transport-controls">
+            <button className="pbtn pbtn-skip" onClick={() => { if (videoRef.current) videoRef.current.currentTime -= 10; }}>
+              <Icon name="prev" size={18} stroke={1.5} color="#fff" />
+            </button>
+            <button className="pbtn play" onClick={togglePlay}>
+              <Icon name={playing ? 'pause' : 'play'} size={18} color="#000" stroke={1.5} />
+            </button>
+            <button className="pbtn pbtn-skip" onClick={() => { if (videoRef.current) videoRef.current.currentTime += 10; }}>
+              <Icon name="next" size={18} stroke={1.5} color="#fff" />
+            </button>
+          </div>
+          <div className="utility-controls">
+            <button className="pbtn utility-volume" title="볼륨" onClick={() => {
+              const v = videoRef.current;
+              if (v) v.muted = !v.muted;
+            }}>
+              <Icon name="volume" size={16} stroke={1.5} color="#fff" />
+            </button>
+            <div className="settings-wrap" ref={settingsRef}>
+              <button
+                className={`pbtn${showSettings ? ' active' : ''}`}
+                title="재생 방식"
+                onClick={() => setShowSettings((s) => !s)}
+              >
+                <Icon name="settings" size={16} stroke={1.5} color="#fff" />
+              </button>
+              {showSettings && (
+                <div className="settings-menu">
+                  <div className="settings-head">재생 방식</div>
+                  <button
+                    className={`settings-item${!useTranscode ? ' active' : ''}`}
+                    onClick={() => selectMode('content')}
+                  >
+                    <div className="si-main">
+                      <span className="si-title">일반 재생</span>
+                      <span className="si-desc">원본 그대로 전송 · 빠름</span>
+                    </div>
+                    {!useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
+                  </button>
+                  <button
+                    className={`settings-item${useTranscode ? ' active' : ''}`}
+                    onClick={() => selectMode('stream')}
+                  >
+                    <div className="si-main">
+                      <span className="si-title">실시간 트랜스코딩</span>
+                      <span className="si-desc">서버 슬롯 사용 · H.264 변환</span>
+                    </div>
+                    {useTranscode && <Icon name="check" size={16} color="var(--accent)" />}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button className="pbtn" title={isFullscreen ? '전체화면 종료' : '전체화면'} onClick={toggleFullscreen}>
+              <Icon name="fullscreen" size={16} stroke={1.5} color="#fff" />
+            </button>
+            <span className="time duration-time">{formatTime(duration)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1183,14 +1314,23 @@ const videoStyles = `
     display:grid;
     grid-template-rows: 1fr auto;
     height:100%;
-    background:#000;
+    background:#10131d;
     color:#fff;
   }
   .video-stage{
     position:relative;
     display:flex; align-items:center; justify-content:center;
     overflow:hidden;
-    background:radial-gradient(circle at 50% 40%, #1c2030, #000 70%);
+    background:radial-gradient(circle at 50% 40%, #263047, #10131d 74%);
+  }
+  .video-el{
+    width:80%;
+    max-width:1080px;
+    max-height:calc(100% - 40px);
+    border-radius:16px;
+    object-fit:contain;
+    background:transparent;
+    box-shadow:0 30px 80px rgba(0,0,0,0.6);
   }
   .video-back{
     position:absolute; top:18px; left:18px;
@@ -1258,8 +1398,10 @@ const videoStyles = `
 
   .player-chrome{
     padding:18px 22px;
-    background:linear-gradient(180deg,#0a0a0a,#050505);
-    border-top:.5px solid rgba(255,255,255,0.06);
+    background:
+      linear-gradient(180deg, rgba(38,48,71,0.72), rgba(16,19,29,0.98) 58%),
+      #10131d;
+    border-top:.5px solid rgba(255,255,255,0.08);
   }
   .scrubber{
     position:relative; height:6px; border-radius:99px;
@@ -1282,16 +1424,37 @@ const videoStyles = `
     box-shadow:0 2px 6px rgba(0,0,0,0.4);
   }
   .player-row{
-    display:flex; align-items:center; gap:8px; color:#fff;
+    display:grid;
+    grid-template-columns:minmax(70px, 1fr) auto minmax(70px, 1fr);
+    align-items:center;
+    gap:8px;
+    color:#fff;
+  }
+  .player-time{
+    justify-self:start;
+    min-width:0;
   }
   .player-row .time{
     font-family:'JetBrains Mono',monospace;
     font-size:12px; opacity:0.8; min-width:54px;
   }
+  .transport-controls{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    min-width:max-content;
+  }
+  .utility-controls{
+    display:flex; align-items:center; justify-content:flex-end; gap:8px;
+    justify-self:end;
+    min-width:0;
+  }
+  .duration-time{
+    text-align:right;
+  }
   .pbtn{
     width:36px; height:36px; border-radius:8px;
     display:grid; place-items:center;
     background:transparent; border:0; color:#fff; opacity:0.85;
+    flex:0 0 auto;
   }
   .pbtn:hover{background:rgba(255,255,255,0.1); opacity:1}
   .pbtn.play{
@@ -1300,7 +1463,6 @@ const videoStyles = `
   }
   .pbtn.play:hover{opacity:1}
   .pbtn.active{background:rgba(255,255,255,0.16); opacity:1}
-  .player-row .stretch{flex:1}
 
   .settings-wrap{position:relative; display:flex}
   .settings-menu{
@@ -1357,16 +1519,19 @@ const videoStyles = `
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     background: #000;
   }
   .video-page.is-fullscreen .video-stage {
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
   }
-  .video-page.is-fullscreen video {
+  .video-page.is-fullscreen .video-el {
     width: 100% !important;
     height: 100% !important;
     max-width: none !important;
+    max-height: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
   }
@@ -1376,7 +1541,7 @@ const videoStyles = `
     left: 0;
     right: 0;
     z-index: 10;
-    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85) 30%, #000);
+    background: linear-gradient(180deg, transparent, rgba(16,19,29,0.76) 32%, #10131d);
     border-top: 0;
     padding: 40px 24px 24px;
   }
@@ -1392,6 +1557,83 @@ const videoStyles = `
   }
   .player-chrome, .video-back, .video-title, .transcoding-hud {
     transition: opacity 0.3s ease;
+  }
+
+  @media (max-width: 640px) {
+    .video-stage{
+      padding:12px;
+    }
+    .video-el{
+      width:min(92vw, 520px);
+      max-width:calc(100vw - 24px);
+      max-height:calc(100% - 24px);
+      border-radius:12px;
+      box-shadow:0 18px 48px rgba(0,0,0,0.38);
+    }
+    .video-back{
+      top:max(10px, env(safe-area-inset-top, 0px));
+      left:10px;
+      padding:8px;
+      border-radius:9px;
+      font-size:0;
+      gap:0;
+    }
+    .video-title{
+      top:max(13px, env(safe-area-inset-top, 0px));
+      left:54px;
+      right:12px;
+      max-width:none;
+    }
+    .video-title .t{
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      font-size:13px;
+    }
+    .video-title .s,
+    .transcoding-hud{
+      display:none;
+    }
+    .player-chrome{
+      padding:12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .scrubber{
+      height:8px;
+      margin-bottom:12px;
+    }
+    .player-row{
+      grid-template-columns:minmax(48px, 1fr) auto minmax(48px, 1fr);
+      gap:6px;
+    }
+    .player-row .time{
+      min-width:0;
+      font-size:11px;
+    }
+    .transport-controls,
+    .utility-controls{
+      gap:6px;
+    }
+    .pbtn{
+      width:34px;
+      height:34px;
+      border-radius:8px;
+    }
+    .pbtn.play{
+      width:44px;
+      height:44px;
+    }
+    .utility-volume,
+    .duration-time{
+      display:none;
+    }
+    .settings-menu{
+      right:-40px;
+      bottom:42px;
+      width:min(240px, calc(100vw - 24px));
+    }
+    .video-page.is-fullscreen .player-chrome{
+      padding:36px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
   }
 
 `;

@@ -90,7 +90,8 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; }
+html, body, #root { margin: 0; padding: 0; height: 100%; }
+html { background: var(--bg-shell); }
 body {
   font-family: 'Pretendard Variable', Roboto, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   background: var(--bg-shell);
@@ -101,6 +102,18 @@ body {
   word-break: keep-all;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+html[data-media-route="video"],
+body[data-media-route="video"],
+html[data-media-route="video"] #root {
+  background: #10131d;
+}
+
+html[data-media-route="viewer"],
+body[data-media-route="viewer"],
+html[data-media-route="viewer"] #root {
+  background: #0f1015;
 }
 
 .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
