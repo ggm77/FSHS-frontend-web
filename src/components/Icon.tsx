@@ -39,6 +39,8 @@ const PATHS: Record<string, string> = {
   pause:       '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
   prev:        '<path d="M19 4 7 12l12 8zM5 4v16" fill="currentColor"/>',
   next:        '<path d="M5 4 17 12 5 20zM19 4v16" fill="currentColor"/>',
+  rewind10:    '<path d="M11 6 7 2 3 6"/><path d="M7 2v7a7 7 0 1 0 7-7"/>',
+  forward10:   '<path d="m13 6 4-4 4 4"/><path d="M17 2v7a7 7 0 1 1-7-7"/>',
   shuffle:     '<path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
   repeat:      '<path d="M17 2l3 3-3 3M3 11V9a4 4 0 0 1 4-4h13M7 22l-3-3 3-3M21 13v2a4 4 0 0 1-4 4H4"/>',
   volume:      '<path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor"/><path d="M19 8a5 5 0 0 1 0 8M16 11a2 2 0 0 1 0 2"/>',

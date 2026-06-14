@@ -959,8 +959,24 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     const v = videoRef.current;
     if (!v || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const targetTime = pct * duration;
+
+    if (reloadSeek) {
+      setStreamStart(targetTime);
+      setCurrentTime(targetTime);
+      setBuffered(targetTime);
+    } else {
+      v.currentTime = targetTime;
+    }
+  }
+
+  function seekBySeconds(delta: number) {
+    const v = videoRef.current;
+    if (!v) return;
+    const baseTime = reloadSeek ? currentTime : v.currentTime;
+    const maxTime = duration || v.duration || Number.POSITIVE_INFINITY;
+    const targetTime = Math.max(0, Math.min(baseTime + delta, maxTime));
 
     if (reloadSeek) {
       setStreamStart(targetTime);
@@ -1237,24 +1253,26 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
       </div>
 
       <div className="player-chrome">
-        <div className="scrubber" onClick={handleSeek} style={{ cursor: 'pointer' }}>
-          <div className="buf" style={{ width: bufPct + '%' }} />
-          <div className="prog" style={{ width: pct + '%' }} />
-          <div className="knob" style={{ left: pct + '%' }} />
+        <div className="scrubber-hit" onClick={handleSeek} title="재생 위치 이동">
+          <div className="scrubber">
+            <div className="buf" style={{ width: bufPct + '%' }} />
+            <div className="prog" style={{ width: pct + '%' }} />
+            <div className="knob" style={{ left: pct + '%' }} />
+          </div>
         </div>
         <div className="player-row">
           <div className="player-time">
             <span className="time">{formatTime(currentTime)}</span>
           </div>
           <div className="transport-controls">
-            <button className="pbtn pbtn-skip" onClick={() => { if (videoRef.current) videoRef.current.currentTime -= 10; }}>
-              <Icon name="prev" size={18} stroke={1.5} color="#fff" />
+            <button className="pbtn pbtn-skip" title="10초 뒤로" onClick={() => seekBySeconds(-10)}>
+              <Icon name="rewind10" size={22} stroke={1.7} color="#fff" />
             </button>
             <button className="pbtn play" onClick={togglePlay}>
               <Icon name={playing ? 'pause' : 'play'} size={18} color="#000" stroke={1.5} />
             </button>
-            <button className="pbtn pbtn-skip" onClick={() => { if (videoRef.current) videoRef.current.currentTime += 10; }}>
-              <Icon name="next" size={18} stroke={1.5} color="#fff" />
+            <button className="pbtn pbtn-skip" title="10초 앞으로" onClick={() => seekBySeconds(10)}>
+              <Icon name="forward10" size={22} stroke={1.7} color="#fff" />
             </button>
           </div>
           <div className="utility-controls">
@@ -1403,10 +1421,19 @@ const videoStyles = `
       #10131d;
     border-top:.5px solid rgba(255,255,255,0.08);
   }
+  .scrubber-hit{
+    position:relative;
+    height:22px;
+    display:flex;
+    align-items:center;
+    cursor:pointer;
+    touch-action:manipulation;
+    margin-bottom:8px;
+  }
   .scrubber{
+    width:100%;
     position:relative; height:6px; border-radius:99px;
     background:rgba(255,255,255,0.12);
-    margin-bottom:14px;
   }
   .scrubber .buf{
     position:absolute; top:0; left:0; height:100%;
@@ -1463,6 +1490,10 @@ const videoStyles = `
   }
   .pbtn.play:hover{opacity:1}
   .pbtn.active{background:rgba(255,255,255,0.16); opacity:1}
+  .pbtn-skip{
+    position:relative;
+    width:42px;
+  }
 
   .settings-wrap{position:relative; display:flex}
   .settings-menu{
@@ -1597,9 +1628,12 @@ const videoStyles = `
     .player-chrome{
       padding:12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
     }
+    .scrubber-hit{
+      height:28px;
+      margin-bottom:6px;
+    }
     .scrubber{
       height:8px;
-      margin-bottom:12px;
     }
     .player-row{
       grid-template-columns:minmax(48px, 1fr) auto minmax(48px, 1fr);
@@ -1617,6 +1651,9 @@ const videoStyles = `
       width:34px;
       height:34px;
       border-radius:8px;
+    }
+    .pbtn-skip{
+      width:40px;
     }
     .pbtn.play{
       width:44px;

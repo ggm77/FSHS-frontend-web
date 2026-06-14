@@ -66,6 +66,13 @@ function getMediaThemeColor(type: NonNullable<MediaRoute>['type']): string {
   return type === 'video' ? VIDEO_THEME_COLOR : VIEWER_THEME_COLOR;
 }
 
+function getInitialDarkMode(): boolean {
+  const storedTheme = localStorage.getItem('theme');
+  if (storedTheme === 'dark') return true;
+  if (storedTheme === 'light') return false;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+}
+
 function applyShellChrome(
   color: string,
   routeType: NonNullable<MediaRoute>['type'] | null,
@@ -242,7 +249,7 @@ function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
 export default function App() {
   const [authed, setAuthed] = useState(() => loadCachedUser() !== null);
   const [screen, setScreen] = useState<Screen>('files');
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [dark, setDark] = useState(getInitialDarkMode);
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
   const [loginRoute, setLoginRoute] = useState(() => isLoginRoute(window.location.pathname));
