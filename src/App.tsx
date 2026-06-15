@@ -11,12 +11,13 @@ import { SearchScreen } from './screens/SearchScreen';
 import { ShareScreen } from './screens/ShareScreen';
 import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
+import { TranscodingScreen } from './screens/TranscodingScreen';
 import { logout } from './api/auth';
 import { getUser } from './api/users';
 import { ApiError } from './api/client';
 import type { UserResponseDto, FileResponseDto } from './types';
 
-type Screen = 'files' | 'gallery' | 'search' | 'share' | 'users' | 'settings' | 'admin';
+type Screen = 'files' | 'gallery' | 'search' | 'share' | 'users' | 'settings' | 'admin' | 'transcoding';
 
 // 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
 // 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
@@ -154,8 +155,9 @@ const NAV = [
     { id: 'share',  label: '공유',   icon: 'share' },
   ]},
   { group: '시스템', items: [
-    { id: 'admin',  label: '대시보드', icon: 'admin' },
-    { id: 'users',  label: '사용자',   icon: 'users' },
+    { id: 'admin',        label: '대시보드',   icon: 'admin' },
+    { id: 'users',        label: '사용자',     icon: 'users' },
+    { id: 'transcoding',  label: '트랜스코딩', icon: 'cpu' },
   ]},
 ];
 
@@ -519,8 +521,9 @@ export default function App() {
         {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
         {screen === 'share'   && <ShareScreen />}
         {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
-        {screen === 'settings'&& <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
-        {screen === 'admin'   && <AdminScreen />}
+        {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
+        {screen === 'admin'        && <AdminScreen />}
+        {screen === 'transcoding'  && <TranscodingScreen />}
       </main>
     </div>
   );
