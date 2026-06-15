@@ -621,7 +621,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         </div>
 
         {/* Breadcrumb */}
-        {path.length > 0 && (
+        {rootFolderId != null && (
           <div className="file-breadcrumbs">
             {visibleCrumbItems.map((c, i) => (
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1065,16 +1065,25 @@ const filesStyles = `
     gap:16px;
     margin-bottom:14px;
   }
+  .file-page-head > div{
+    min-width:0;
+  }
   .file-page-head h1{
     margin:0;
     font-size:22px;
     font-weight:800;
+    line-height:1.2;
     color:var(--fg);
   }
   .file-page-head p{
     margin:5px 0 0;
     font-size:13px;
+    line-height:18px;
+    min-height:18px;
     color:var(--fg-3);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .file-breadcrumbs{
     display:flex;
