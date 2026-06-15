@@ -70,9 +70,9 @@ function sortFolders(folders: SimpleFolderResponseDto[]): SimpleFolderResponseDt
   });
 }
 
-function sortImages(files: FileResponseDto[]): FileResponseDto[] {
+function sortMediaFiles(files: FileResponseDto[]): FileResponseDto[] {
   return [...files]
-    .filter(file => file.category === 'IMAGE')
+    .filter(file => file.category === 'IMAGE' || file.category === 'VIDEO')
     .sort((a, b) => {
       const byDate = Date.parse(b.originUpdatedAt) - Date.parse(a.originUpdatedAt);
       if (byDate !== 0 && !Number.isNaN(byDate)) return byDate;
@@ -81,7 +81,7 @@ function sortImages(files: FileResponseDto[]): FileResponseDto[] {
     });
 }
 
-export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
+export function GalleryScreen({ rootFolderId, onOpenFile, onOpenVideo }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<FolderPathItem[]>([]);
   const [zoom, setZoom] = useState<'s' | 'm' | 'l'>('m');
@@ -92,11 +92,11 @@ export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
     () => folder ? sortFolders(folder.folders) : [],
     [folder],
   );
-  const imageFiles = useMemo(
-    () => folder ? sortImages(folder.files) : [],
+  const mediaFiles = useMemo(
+    () => folder ? sortMediaFiles(folder.files) : [],
     [folder],
   );
-  const days = useMemo(() => groupByDate(imageFiles), [imageFiles]);
+  const days = useMemo(() => groupByDate(mediaFiles), [mediaFiles]);
 
   const syncGalleryHistory = useCallback((folderId: number, mode: HistoryMode) => {
     if (mode === 'none') return;
@@ -244,7 +244,7 @@ export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
             <h1>갤러리</h1>
             <p>
               {currentFolderName}
-              {folder ? ` · 사진 ${imageFiles.length}개 · 하위 폴더 ${sortedFolders.length}개` : ' · 불러오는 중'}
+              {folder ? ` · 미디어 ${mediaFiles.length}개 · 하위 폴더 ${sortedFolders.length}개` : ' · 불러오는 중'}
             </p>
           </div>
         </div>
@@ -265,7 +265,7 @@ export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
         )}
 
         <div className="gallery-toolbar">
-          <span>현재 폴더의 사진만 표시</span>
+          <span>현재 폴더의 사진·동영상만 표시</span>
           <div className="spacer" />
           <div className="seg">
             <button className={zoom === 's' ? 'on' : ''} onClick={() => setZoom('s')}>S</button>
@@ -303,7 +303,7 @@ export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
             {days.length === 0 ? (
               <div className="gallery-empty">
                 <div className="empty-icon"><Icon name="gallery" size={32} stroke={1.4} /></div>
-                <div className="empty-title">이 폴더에 사진이 없습니다</div>
+                <div className="empty-title">이 폴더에 사진이나 동영상이 없습니다</div>
               </div>
             ) : days.map((day, di) => (
               <div className="gallery-day" key={di}>
@@ -315,13 +315,18 @@ export function GalleryScreen({ rootFolderId, onOpenFile }: Props) {
                   {day.items.map(f => (
                     <button key={f.id}
                       className="gphoto"
-                      onClick={() => onOpenFile(f.id)}>
+                      onClick={() => f.category === 'VIDEO' ? onOpenVideo?.(f.id, f) : onOpenFile(f.id)}>
                       <img
                         src={getFileThumbnailUrl(f.uuid)}
                         alt={f.name}
                         className="gphoto-img"
                         loading="lazy"
                       />
+                      {f.category === 'VIDEO' && (
+                        <div className="gphoto-video-badge">
+                          <Icon name="play" size={14} />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -469,6 +474,7 @@ const galleryStyles = `
   .gallery-grid.zoom-l{grid-template-columns:repeat(auto-fill, minmax(240px, 1fr))}
 
   .gphoto{
+    position:relative;
     aspect-ratio:1;
     border:0;
     padding:0;
@@ -476,6 +482,20 @@ const galleryStyles = `
     overflow:hidden;
     cursor:pointer;
     background:var(--surface-2);
+  }
+  .gphoto-video-badge{
+    position:absolute;
+    bottom:6px;
+    left:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:26px;
+    height:26px;
+    border-radius:50%;
+    background:rgba(0,0,0,0.55);
+    color:#fff;
+    pointer-events:none;
   }
   .gphoto .gphoto-img{
     width:100%;
