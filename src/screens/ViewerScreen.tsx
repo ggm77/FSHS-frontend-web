@@ -16,6 +16,7 @@ function getErrorMessage(err: unknown, fallback: string): string {
 export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState('');
@@ -29,13 +30,29 @@ export function ViewerScreen({ fileId, onBack }: Props) {
       .finally(() => setLoading(false));
   }, [fileId]);
 
-  if (fileId == null) return null;
-
-  const fileUrl = getFileContentUrl(fileId, false);
-
   const isImage = file?.category === 'IMAGE';
   const isPdf = file?.extension === 'pdf';
   const isText = ['txt', 'log', 'json', 'md', 'html', 'css', 'js', 'ts', 'tsx'].includes(file?.extension || '');
+
+  useEffect(() => {
+    if (!file || !fileId || (!isPdf && !isText)) return;
+    let objectUrl: string;
+    fetch(getFileContentUrl(fileId, false), { credentials: 'include' })
+      .then(r => r.blob())
+      .then(blob => {
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setBlobUrl(null);
+    };
+  }, [file, fileId, isPdf, isText]);
+
+  if (fileId == null) return null;
+
+  const fileUrl = getFileContentUrl(fileId, false);
 
   async function handleDownload() {
     if (!file || downloading) return;
@@ -110,7 +127,9 @@ export function ViewerScreen({ fileId, onBack }: Props) {
             <img src={fileUrl} alt={file.name} className="viewer-img" />
           </div>
         ) : isPdf || isText ? (
-          <iframe src={fileUrl} className="viewer-iframe" title={file.name} />
+          blobUrl
+            ? <iframe src={blobUrl} className="viewer-iframe" title={file.name} />
+            : <div className="viewer-loader"><Icon name="spinner" size={28} /><span>파일을 불러오는 중...</span></div>
         ) : (
           <div className="viewer-fallback">
             <div className="icon-wrap">
