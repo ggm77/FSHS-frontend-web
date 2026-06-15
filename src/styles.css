@@ -155,7 +155,23 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 22px 20px 18px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-brand:hover {
+  background: rgba(49, 88, 255, 0.06);
+}
+
+.sb-brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
 }
 
 .sb-brand .logo {

@@ -1,6 +1,6 @@
 import { request } from './client';
 import { downloadUrl, type DownloadProgress } from './download';
-import type { FolderResponseDto } from '../types';
+import type { FolderResponseDto, FolderSyncResponseDto } from '../types';
 
 export function getFolder(folderId: number): Promise<FolderResponseDto> {
   return request(`/folders/${folderId}`);
@@ -22,6 +22,10 @@ export async function renameFolder(folderId: number, name?: string, parentFolder
 
 export async function deleteFolder(folderId: number): Promise<void> {
   return request(`/folders/${folderId}`, { method: 'DELETE' });
+}
+
+export async function syncFolder(folderId: number): Promise<FolderSyncResponseDto> {
+  return request(`/folders/${folderId}/sync`, { method: 'POST' });
 }
 
 export function getFolderDownloadUrl(folderId: number): string {

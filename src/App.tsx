@@ -8,7 +8,6 @@ import { GalleryScreen } from './screens/GalleryScreen';
 import { VideoScreen } from './screens/VideoScreen';
 import { ViewerScreen } from './screens/ViewerScreen';
 import { SearchScreen } from './screens/SearchScreen';
-import { SyncScreen } from './screens/SyncScreen';
 import { ShareScreen } from './screens/ShareScreen';
 import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
@@ -17,7 +16,7 @@ import { getUser } from './api/users';
 import { ApiError } from './api/client';
 import type { UserResponseDto, FileResponseDto } from './types';
 
-type Screen = 'files' | 'gallery' | 'search' | 'sync' | 'share' | 'users' | 'settings' | 'admin';
+type Screen = 'files' | 'gallery' | 'search' | 'share' | 'users' | 'settings' | 'admin';
 
 // 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
 // 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
@@ -152,7 +151,6 @@ const NAV = [
   ]},
   { group: '도구', items: [
     { id: 'search', label: '검색',   icon: 'search' },
-    { id: 'sync',   label: '동기화', icon: 'sync' },
     { id: 'share',  label: '공유',   icon: 'share' },
   ]},
   { group: '시스템', items: [
@@ -176,16 +174,34 @@ function Avatar({ username, size = 32 }: { username: string; size?: number }) {
   );
 }
 
-function Sidebar({ active, onNav, user, className }: { active: string; onNav: (id: string) => void; user: UserResponseDto | null; className?: string }) {
+function Sidebar({
+  active,
+  onNav,
+  onRootClick,
+  user,
+  className,
+}: {
+  active: string;
+  onNav: (id: string) => void;
+  onRootClick: () => void;
+  user: UserResponseDto | null;
+  className?: string;
+}) {
   return (
     <aside className={`sidebar ${className || ''}`}>
-      <div className="sb-brand">
+      <button
+        type="button"
+        className="sb-brand"
+        onClick={onRootClick}
+        title="루트 디렉토리로 이동"
+        aria-label="루트 디렉토리로 이동"
+      >
         <img src="/logo.png" alt="FSHS" className="sb-logo-img" />
         <div>
           <div className="name">FSHS</div>
           <div className="host">fshs2.seohamin.com</div>
         </div>
-      </div>
+      </button>
       <nav className="sb-nav">
         {NAV.map((g) => (
           <div className="sb-group" key={g.group}>
@@ -407,9 +423,26 @@ export default function App() {
 
   function handleNav(id: string) {
     if (id === 'logout') { handleLogout(); return; }
+    if (id === 'files') { handleRootClick(); return; }
     setScreen(id as Screen);
     window.history.replaceState({ screen: id }, '');
     setSidebarOpen(false);
+  }
+
+  function handleRootClick() {
+    const alreadyAtRootDirectory = screen === 'files'
+      && window.location.pathname === '/'
+      && window.location.search === ''
+      && window.location.hash === '';
+
+    setScreen('files');
+    setSidebarOpen(false);
+    if (alreadyAtRootDirectory) {
+      window.history.replaceState({ screen: 'files' }, '', '/');
+    } else {
+      window.history.pushState({ screen: 'files' }, '', '/');
+    }
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
   // 미디어 하위 페이지로 이동한다. 떠나기 전에 현재 화면 이름을 현재 항목에 기록해 둔다.
@@ -472,7 +505,7 @@ export default function App() {
   return (
     <div className="app">
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-      <Sidebar active={screen} onNav={handleNav} user={user} className={sidebarOpen ? 'open' : ''} />
+      <Sidebar active={screen} onNav={handleNav} onRootClick={handleRootClick} user={user} className={sidebarOpen ? 'open' : ''} />
       <main className="main">
         <TopBar
           onSearch={() => setScreen('search')}
@@ -484,7 +517,6 @@ export default function App() {
         {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
         {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
         {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} />}
-        {screen === 'sync'    && <SyncScreen />}
         {screen === 'share'   && <ShareScreen />}
         {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
         {screen === 'settings'&& <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}

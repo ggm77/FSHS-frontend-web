@@ -61,3 +61,13 @@ export interface FileStatusDto {
   status: 'PROCESSING' | 'COMPLETE' | 'ERROR';
   id: number | null;
 }
+
+export interface FolderSyncResponseDto {
+  createdFolders: string[];
+  createdFiles: string[];
+  updatedFiles: string[];
+  deletedFolders: string[];
+  deletedFiles: string[];
+  skipped: string[];
+  errors: string[];
+}

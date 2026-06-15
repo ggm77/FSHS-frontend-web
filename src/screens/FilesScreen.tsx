@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '../components/Icon';
-import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent } from '../api/folders';
+import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent, syncFolder } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
-import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto } from '../types';
+import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto, FolderSyncResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
 
 interface Props {
@@ -27,6 +27,7 @@ type FolderPathItem = { id: number; name: string };
 type HistoryMode = 'push' | 'replace' | 'none';
 type FileSortKey = 'name' | 'originUpdatedAt' | 'size';
 type SortDirection = 'asc' | 'desc';
+type SyncResultKey = keyof FolderSyncResponseDto;
 type SortableFileItem = Pick<SimpleFolderResponseDto, 'id' | 'name' | 'originUpdatedAt'> & {
   size?: number;
 };
@@ -35,6 +36,16 @@ const SORT_OPTIONS: { key: FileSortKey; label: string }[] = [
   { key: 'name', label: '이름순' },
   { key: 'originUpdatedAt', label: '수정일순' },
   { key: 'size', label: '크기순' },
+];
+
+const SYNC_RESULT_GROUPS: { key: SyncResultKey; label: string; tone: 'good' | 'info' | 'warn' | 'bad' }[] = [
+  { key: 'createdFolders', label: '생성된 폴더', tone: 'good' },
+  { key: 'createdFiles', label: '생성된 파일', tone: 'good' },
+  { key: 'updatedFiles', label: '수정된 파일', tone: 'info' },
+  { key: 'deletedFolders', label: '삭제된 폴더', tone: 'bad' },
+  { key: 'deletedFiles', label: '삭제된 파일', tone: 'bad' },
+  { key: 'skipped', label: '스킵', tone: 'warn' },
+  { key: 'errors', label: '오류', tone: 'bad' },
 ];
 
 const WINDOWS_NAME_COLLATOR = new Intl.Collator(undefined, {
@@ -149,6 +160,10 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
 
+function countSyncResult(result: FolderSyncResponseDto): number {
+  return SYNC_RESULT_GROUPS.reduce((total, group) => total + result[group.key].length, 0);
+}
+
 export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<FolderPathItem[]>([]);
@@ -186,6 +201,9 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [downloadState, setDownloadState] = useState<DownloadState | null>(null);
+  const [syncingFolder, setSyncingFolder] = useState(false);
+  const [syncResult, setSyncResult] = useState<FolderSyncResponseDto | null>(null);
+  const [syncResultFolderName, setSyncResultFolderName] = useState('');
   const [error, setError] = useState('');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortMenuPos, setSortMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -509,6 +527,26 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     runDownload(`file-${file.id}`, file.name, onProgress => downloadFileContent(file.id, file.name, onProgress));
   }
 
+  async function handleSyncCurrentFolder() {
+    if (currentFolderId == null || syncingFolder) return;
+
+    const targetFolderId = currentFolderId;
+    const targetFolderName = path.length > 0 ? path[path.length - 1].name : '내 저장소';
+    setSyncingFolder(true);
+    setError('');
+
+    try {
+      const result = await syncFolder(targetFolderId);
+      setSyncResult(result);
+      setSyncResultFolderName(targetFolderName);
+      await loadFolder(targetFolderId);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '현재 폴더 동기화 중 오류가 발생했습니다.'));
+    } finally {
+      setSyncingFolder(false);
+    }
+  }
+
   async function handleConfirmMove() {
     if (!movingItem || currentFolderId == null) return;
     
@@ -564,6 +602,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         crumbItems[crumbItems.length - 1],
       ]
     : crumbItems;
+  const syncResultTotal = syncResult ? countSyncResult(syncResult) : 0;
 
   return (
     <>
@@ -606,6 +645,15 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           </button>
           <button className="btn" onClick={() => { setShowNewFolder(v => !v); setNewFolderName('새 폴더'); }}>
             <Icon name="plus" size={15} /> 새 폴더
+          </button>
+          <button
+            className="btn sync-current-btn"
+            onClick={handleSyncCurrentFolder}
+            disabled={currentFolderId == null || loading || syncingFolder}
+            title="현재 폴더 동기화"
+          >
+            <Icon name={syncingFolder ? 'spinner' : 'sync'} size={15} className={syncingFolder ? 'spin-icon' : undefined} />
+            <span className="sync-btn-label">{syncingFolder ? '동기화 중...' : '현재 폴더 동기화'}</span>
           </button>
           {showNewFolder && (
             <>
@@ -928,6 +976,57 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         </div>
       )}
 
+      {syncResult && (
+        <div className="modal-backdrop" onClick={() => setSyncResult(null)}>
+          <div className="modal sync-result-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>동기화 결과</h3>
+                <p>{syncResultFolderName} · {syncResultTotal > 0 ? `총 ${syncResultTotal}개 항목 처리` : '변경된 항목 없음'}</p>
+              </div>
+              <button className="close-btn" onClick={() => setSyncResult(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="sync-result-summary">
+                {SYNC_RESULT_GROUPS.map(group => (
+                  <div className={`sync-result-pill ${group.tone}`} key={group.key}>
+                    <span>{group.label}</span>
+                    <strong>{syncResult[group.key].length}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="sync-result-list">
+                {SYNC_RESULT_GROUPS.map(group => {
+                  const items = syncResult[group.key];
+                  return (
+                    <section className="sync-result-group" key={group.key}>
+                      <div className="sync-result-group-title">
+                        <span>{group.label}</span>
+                        <strong>{items.length}</strong>
+                      </div>
+                      {items.length > 0 ? (
+                        <ul>
+                          {items.map((item, index) => (
+                            <li className="mono" key={`${group.key}-${index}`} title={item}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="sync-result-empty">항목 없음</div>
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn primary" onClick={() => setSyncResult(null)}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {dialog && (
         <div className="modal-backdrop" onClick={() => setDialog(null)}>
           <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
@@ -991,6 +1090,14 @@ const filesStyles = `
     padding:0 0 14px;
   }
   .files-toolbar .spacer{ flex:1; }
+  .sync-current-btn{
+    color:var(--accent);
+    background:var(--accent-soft);
+    border-color:transparent;
+  }
+  .sync-current-btn:hover{
+    background:var(--surface-1);
+  }
   .new-folder-backdrop{
     position:fixed; inset:0; z-index:40;
   }
@@ -1156,6 +1263,15 @@ const filesStyles = `
       justify-content:center;
     }
     .files-toolbar > .btn.primary .upload-btn-label{
+      display:none;
+    }
+    .files-toolbar > .sync-current-btn{
+      width:32px;
+      min-width:32px;
+      padding:0;
+      justify-content:center;
+    }
+    .files-toolbar > .sync-current-btn .sync-btn-label{
       display:none;
     }
     .files-toolbar{
@@ -1459,6 +1575,159 @@ const filesStyles = `
     padding: 0 16px;
     font-size: 13px;
     font-weight: 600;
+  }
+
+  .sync-result-modal {
+    width: min(720px, calc(100vw - 32px));
+    max-height: min(760px, calc(100vh - 40px));
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sync-result-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .sync-result-modal .modal-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--fg);
+  }
+
+  .sync-result-modal .modal-header p {
+    margin: 5px 0 0;
+    color: var(--fg-3);
+    font-size: 12.5px;
+  }
+
+  .sync-result-modal .close-btn {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-3);
+    display: grid;
+    place-items: center;
+  }
+
+  .sync-result-modal .close-btn:hover {
+    background: var(--surface-1);
+    color: var(--fg);
+  }
+
+  .sync-result-modal .modal-body {
+    padding: 16px 20px 18px;
+    overflow: auto;
+  }
+
+  .sync-result-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .sync-result-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 38px;
+    padding: 0 11px;
+    border-radius: 8px;
+    background: var(--surface-1);
+    color: var(--fg-2);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .sync-result-pill.good { color: var(--good); background: rgba(19, 185, 122, 0.12); }
+  .sync-result-pill.info { color: var(--accent); background: var(--accent-soft); }
+  .sync-result-pill.warn { color: var(--warn); background: rgba(216, 137, 22, 0.14); }
+  .sync-result-pill.bad { color: var(--bad); background: rgba(239, 68, 68, 0.12); }
+
+  .sync-result-pill strong {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sync-result-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+  }
+
+  .sync-result-group {
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .sync-result-group-title {
+    height: 38px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--fg-2);
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+
+  .sync-result-group-title strong {
+    color: var(--fg-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sync-result-group ul {
+    list-style: none;
+    margin: 0;
+    padding: 5px 0;
+    max-height: 170px;
+    overflow: auto;
+  }
+
+  .sync-result-group li {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--fg-2);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sync-result-group li:last-child {
+    border-bottom: 0;
+  }
+
+  .sync-result-empty {
+    padding: 16px 12px;
+    color: var(--fg-3);
+    font-size: 12.5px;
+  }
+
+  .sync-result-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--hairline);
+    background: var(--bg);
   }
 
   .grid-card {
