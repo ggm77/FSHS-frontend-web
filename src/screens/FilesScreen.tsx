@@ -93,17 +93,58 @@ function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number })
   return <Icon name={iconName} size={size} color={color} stroke={1.7} />;
 }
 
-function FileThumbnail({ file, size = 20 }: { file: FileResponseDto; size?: number }) {
+function FileThumbnail({ file, size = 20, root, eager, isScrollingRef, settleCallbacksRef }: {
+  file: FileResponseDto;
+  size?: number;
+  root?: Element | null;
+  eager?: boolean;
+  isScrollingRef?: React.MutableRefObject<boolean>;
+  settleCallbacksRef?: React.MutableRefObject<Set<() => void>>;
+}) {
   const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [loaded, setLoaded] = useState(eager ?? false);
+  const ref = useRef<HTMLDivElement>(null);
   const hasThumbnail = file.category === 'IMAGE' || file.category === 'VIDEO';
+
+  useEffect(() => {
+    if (!hasThumbnail || loaded) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { root: root ?? null, rootMargin: '400px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasThumbnail, loaded, root]);
+
+  useEffect(() => {
+    if (!visible || loaded || !hasThumbnail) return;
+    if (!isScrollingRef?.current) {
+      setLoaded(true);
+      return;
+    }
+    const load = () => setLoaded(true);
+    settleCallbacksRef?.current.add(load);
+    return () => { settleCallbacksRef?.current.delete(load); };
+  }, [visible, loaded, hasThumbnail, isScrollingRef, settleCallbacksRef]);
+
   if (!hasThumbnail || failed) return <FileIcon file={file} size={size} />;
+
   return (
-    <img
-      src={getFileThumbnailUrl(file.uuid)}
-      alt=""
-      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}
-      onError={() => setFailed(true)}
-    />
+    <div ref={ref} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {loaded ? (
+        <img
+          src={getFileThumbnailUrl(file.uuid)}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <FileIcon file={file} size={size} />
+      )}
+    </div>
   );
 }
 
@@ -213,6 +254,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const sortBtnRef = useRef<HTMLButtonElement>(null);
   const filesContentRef = useRef<HTMLDivElement>(null);
   const restoredScrollFolderRef = useRef<number | null>(null);
+  const isScrollingRef = useRef(false);
+  const settleCallbacksRef = useRef(new Set<() => void>());
 
   useEffect(() => {
     if (!showSortMenu) return;
@@ -267,6 +310,40 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     const frameId = window.requestAnimationFrame(restore);
     return () => window.cancelAnimationFrame(frameId);
   }, [activeFolderId, folder, loading]);
+
+  useEffect(() => {
+    const el = filesContentRef.current;
+    if (!el) return;
+
+    let lastY = el.scrollTop;
+    let lastT = performance.now();
+    let timer: ReturnType<typeof setTimeout>;
+
+    const settle = () => {
+      isScrollingRef.current = false;
+      settleCallbacksRef.current.forEach(fn => fn());
+      settleCallbacksRef.current.clear();
+    };
+
+    const onScroll = () => {
+      const now = performance.now();
+      const dt = now - lastT;
+      const vel = (dt > 0 && dt < 500) ? Math.abs(el.scrollTop - lastY) / dt : 5;
+      lastY = el.scrollTop;
+      lastT = now;
+
+      clearTimeout(timer);
+      if (vel < 1.5) {
+        timer = setTimeout(settle, 80);
+      } else {
+        isScrollingRef.current = true;
+        timer = setTimeout(settle, 150);
+      }
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(timer); };
+  }, []);
 
   const syncFolderHistory = useCallback((folderId: number, mode: HistoryMode) => {
     if (mode === 'none') return;
@@ -803,13 +880,13 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                     </div>
                   ))}
                   {/* Files next */}
-                  {sortedFiles.map((f) => (
+                  {sortedFiles.map((f, i) => (
                     <div key={`file-${f.id}`}
                       className={'file-row' + (selected === f.id ? ' selected' : '')}
                       onClick={() => handleOpenFile(f)}>
                       <div className="file-name">
                         <div className="file-thumb-sm">
-                          <FileThumbnail file={f} size={20} />
+                          <FileThumbnail file={f} size={20} root={filesContentRef.current} eager={i < 20} isScrollingRef={isScrollingRef} settleCallbacksRef={settleCallbacksRef} />
                         </div>
                         <span className="nm">{f.name}</span>
                         {f.category === 'VIDEO' && f.videoCodec && (
