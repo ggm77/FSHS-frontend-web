@@ -102,7 +102,7 @@ export function LoginScreen({ onSignIn }: Props) {
             </div>
             <div className="session-host">
               <div className="dot" />
-              fshs2.seohamin.com
+              fshs.seohamin.com
             </div>
           </div>
         ) : (
