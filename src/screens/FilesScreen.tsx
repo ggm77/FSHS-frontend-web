@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent, syncFolder } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
@@ -52,6 +52,7 @@ const WINDOWS_NAME_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: 'base',
 });
+const FILES_SCROLL_POSITIONS = new Map<number, number>();
 
 function getFolderIdFromHash(): number | null {
   let hash = '';
@@ -210,6 +211,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const sortBtnRef = useRef<HTMLButtonElement>(null);
+  const filesContentRef = useRef<HTMLDivElement>(null);
+  const restoredScrollFolderRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!showSortMenu) return;
@@ -224,6 +227,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   }, [showSortMenu]);
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
+  const activeFolderId = folder?.id ?? currentFolderId ?? null;
   const downloadingKey = downloadState?.key ?? null;
   const sortedFolders = useMemo(
     () => folder ? sortFileItems(folder.folders, sortKey, sortDirection) : [],
@@ -233,6 +237,36 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     () => folder ? sortFileItems(folder.files, sortKey, sortDirection) : [],
     [folder, sortDirection, sortKey],
   );
+
+  const saveScrollPosition = useCallback(() => {
+    if (activeFolderId == null || !filesContentRef.current) return;
+    FILES_SCROLL_POSITIONS.set(activeFolderId, filesContentRef.current.scrollTop);
+  }, [activeFolderId]);
+
+  useLayoutEffect(() => {
+    return () => saveScrollPosition();
+  }, [saveScrollPosition]);
+
+  useLayoutEffect(() => {
+    if (loading || !folder || activeFolderId == null) return;
+    if (restoredScrollFolderRef.current === activeFolderId) return;
+
+    const scrollTop = FILES_SCROLL_POSITIONS.get(activeFolderId);
+    if (scrollTop == null) return;
+
+    restoredScrollFolderRef.current = activeFolderId;
+    const container = filesContentRef.current;
+    if (!container) return;
+
+    const restore = () => {
+      const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      container.scrollTop = Math.min(scrollTop, maxScrollTop);
+    };
+
+    restore();
+    const frameId = window.requestAnimationFrame(restore);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeFolderId, folder, loading]);
 
   const syncFolderHistory = useCallback((folderId: number, mode: HistoryMode) => {
     if (mode === 'none') return;
@@ -527,6 +561,13 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     runDownload(`file-${file.id}`, file.name, onProgress => downloadFileContent(file.id, file.name, onProgress));
   }
 
+  function handleOpenFile(file: FileResponseDto) {
+    setSelected(file.id);
+    saveScrollPosition();
+    if (file.category === 'VIDEO') onOpenVideo(file.id, file);
+    else onOpenFile(file.id);
+  }
+
   async function handleSyncCurrentFolder() {
     if (currentFolderId == null || syncingFolder) return;
 
@@ -607,7 +648,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   return (
     <>
       <style>{filesStyles}</style>
-      <div className="content files-content">
+      <div ref={filesContentRef} className="content files-content">
         {error && <div style={{ padding: '12px 16px', background: 'rgba(220,75,62,0.1)', borderRadius: 10, color: 'var(--bad)', marginBottom: 16 }}>{error}</div>}
 
         <div className="file-page-head">
@@ -765,11 +806,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   {sortedFiles.map((f) => (
                     <div key={`file-${f.id}`}
                       className={'file-row' + (selected === f.id ? ' selected' : '')}
-                      onClick={() => {
-                        setSelected(f.id);
-                        if (f.category === 'VIDEO') onOpenVideo(f.id, f);
-                        else onOpenFile(f.id);
-                      }}>
+                      onClick={() => handleOpenFile(f)}>
                       <div className="file-name">
                         <div className="file-thumb-sm">
                           <FileThumbnail file={f} size={20} />
@@ -824,10 +861,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   {/* Files next */}
                   {sortedFiles.map((f) => (
                     <div className="grid-card" key={`file-${f.id}`}
-                      onClick={() => {
-                        if (f.category === 'VIDEO') onOpenVideo(f.id, f);
-                        else onOpenFile(f.id);
-                      }}>
+                      onClick={() => handleOpenFile(f)}>
                       <div className="gc-head">
                         <FileIcon file={f} size={18} />
                         <span className="nm">{f.name}</span>
