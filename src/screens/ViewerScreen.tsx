@@ -13,10 +13,167 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
 
+const TEXT_DOCUMENT_EXTENSIONS = new Set([
+  'txt',
+  'text',
+  'log',
+  'md',
+  'markdown',
+  'csv',
+  'tsv',
+]);
+
+const SOURCE_CODE_EXTENSIONS = new Set([
+  'astro',
+  'bat',
+  'bash',
+  'c',
+  'cc',
+  'cfg',
+  'clj',
+  'cmd',
+  'conf',
+  'cpp',
+  'cs',
+  'css',
+  'cxx',
+  'dart',
+  'dockerfile',
+  'env',
+  'erl',
+  'ex',
+  'exs',
+  'fish',
+  'fs',
+  'fsx',
+  'go',
+  'gradle',
+  'graphql',
+  'groovy',
+  'gql',
+  'h',
+  'hh',
+  'hpp',
+  'hrl',
+  'htm',
+  'html',
+  'ini',
+  'java',
+  'js',
+  'json',
+  'jsonl',
+  'jsx',
+  'kt',
+  'kts',
+  'less',
+  'lua',
+  'mjs',
+  'php',
+  'pl',
+  'pm',
+  'properties',
+  'py',
+  'r',
+  'rb',
+  'rs',
+  'sass',
+  'scala',
+  'scss',
+  'sh',
+  'sql',
+  'svelte',
+  'swift',
+  'toml',
+  'ts',
+  'tsx',
+  'vue',
+  'xml',
+  'yaml',
+  'yml',
+  'zsh',
+]);
+
+const SOURCE_CODE_FILENAMES = new Set([
+  '.babelrc',
+  '.dockerignore',
+  '.editorconfig',
+  '.env',
+  '.eslintrc',
+  '.gitignore',
+  '.npmrc',
+  '.prettierrc',
+  'dockerfile',
+  'gemfile',
+  'jenkinsfile',
+  'makefile',
+  'podfile',
+  'rakefile',
+]);
+
+const TEXT_PREVIEW_MIME_TYPES = new Set([
+  'application/graphql',
+  'application/javascript',
+  'application/json',
+  'application/sql',
+  'application/typescript',
+  'application/x-httpd-php',
+  'application/x-javascript',
+  'application/x-sh',
+  'application/xhtml+xml',
+  'application/xml',
+  'image/svg+xml',
+]);
+
+function normalizeExtension(extension?: string | null): string {
+  return (extension || '').trim().replace(/^\./, '').toLowerCase();
+}
+
+function normalizeFilename(name?: string | null): string {
+  return (name || '').trim().toLowerCase();
+}
+
+function isSourceCodeDocument(file: FileResponseDto): boolean {
+  const extension = normalizeExtension(file.extension);
+  const name = normalizeFilename(file.name);
+  const baseName = normalizeFilename(file.baseName);
+
+  return SOURCE_CODE_EXTENSIONS.has(extension)
+    || SOURCE_CODE_FILENAMES.has(name)
+    || SOURCE_CODE_FILENAMES.has(baseName);
+}
+
+function isPreviewableTextDocument(file: FileResponseDto | null): file is FileResponseDto {
+  if (!file || file.category !== 'DOCUMENT') return false;
+
+  const extension = normalizeExtension(file.extension);
+  const mimeType = normalizeFilename(file.mimeType).split(';')[0];
+
+  return TEXT_DOCUMENT_EXTENSIONS.has(extension)
+    || isSourceCodeDocument(file)
+    || mimeType.startsWith('text/')
+    || TEXT_PREVIEW_MIME_TYPES.has(mimeType);
+}
+
+function getCharset(contentType: string | null): string {
+  const match = contentType?.match(/charset=([^;]+)/i);
+  return match?.[1]?.trim().replace(/^"|"$/g, '') || 'utf-8';
+}
+
+function decodeTextPreview(buffer: ArrayBuffer, contentType: string | null): string {
+  try {
+    return new TextDecoder(getCharset(contentType)).decode(buffer);
+  } catch {
+    return new TextDecoder('utf-8').decode(buffer);
+  }
+}
+
 export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState('');
@@ -24,6 +181,10 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   useEffect(() => {
     if (!fileId) return;
     setLoading(true);
+    setFile(null);
+    setBlobUrl(null);
+    setTextContent(null);
+    setPreviewError('');
     getFile(fileId)
       .then(f => setFile(f))
       .catch(() => {})
@@ -31,24 +192,58 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   }, [fileId]);
 
   const isImage = file?.category === 'IMAGE';
-  const isPdf = file?.extension === 'pdf';
-  const isText = ['txt', 'log', 'json', 'md', 'html', 'css', 'js', 'ts', 'tsx'].includes(file?.extension || '');
+  const isPdf = normalizeExtension(file?.extension) === 'pdf';
+  const isTextDocument = isPreviewableTextDocument(file);
+  const isSourceCode = file ? isSourceCodeDocument(file) : false;
 
   useEffect(() => {
-    if (!file || !fileId || (!isPdf && !isText)) return;
+    setBlobUrl(null);
+    setTextContent(null);
+    setPreviewError('');
+    setPreviewLoading(false);
+
+    if (!file || !fileId || (!isPdf && !isTextDocument)) return;
+
+    let cancelled = false;
     let objectUrl: string;
-    fetch(getFileContentUrl(fileId, false), { credentials: 'include' })
-      .then(r => r.blob())
-      .then(blob => {
-        objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
+    const controller = new AbortController();
+
+    setPreviewLoading(true);
+
+    fetch(getFileContentUrl(fileId, false), {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then(async r => {
+        if (!r.ok) throw new Error(`미리보기 로드 실패: HTTP ${r.status}`);
+        if (isPdf) return r.blob();
+        return r.arrayBuffer().then(buffer => decodeTextPreview(buffer, r.headers.get('Content-Type')));
       })
-      .catch(() => {});
+      .then(blob => {
+        if (cancelled) return;
+        if (blob instanceof Blob) {
+          objectUrl = URL.createObjectURL(blob);
+          setBlobUrl(objectUrl);
+          return;
+        }
+        setTextContent(blob);
+      })
+      .catch(err => {
+        if (controller.signal.aborted) return;
+        if (!cancelled) setPreviewError(getErrorMessage(err, '미리보기를 불러올 수 없습니다.'));
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
     return () => {
+      cancelled = true;
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setBlobUrl(null);
+      setTextContent(null);
     };
-  }, [file, fileId, isPdf, isText]);
+  }, [file, fileId, isPdf, isTextDocument]);
 
   if (fileId == null) return null;
 
@@ -126,10 +321,35 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           <div className="viewer-media-wrap">
             <img src={fileUrl} alt={file.name} className="viewer-img" />
           </div>
-        ) : isPdf || isText ? (
-          blobUrl
-            ? <iframe src={blobUrl} className="viewer-iframe" title={file.name} />
-            : <div className="viewer-loader"><Icon name="spinner" size={28} /><span>파일을 불러오는 중...</span></div>
+        ) : isPdf ? (
+          previewError ? (
+            <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
+          ) : blobUrl ? (
+            <iframe src={blobUrl} className="viewer-iframe" title={file.name} />
+          ) : (
+            <div className="viewer-loader"><Icon name="spinner" size={28} /><span>파일을 불러오는 중...</span></div>
+          )
+        ) : isTextDocument ? (
+          previewError ? (
+            <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
+          ) : textContent !== null ? (
+            <div className="viewer-text-wrap">
+              <div className="viewer-text-bar">
+                <div className="viewer-text-kind">
+                  <Icon name={isSourceCode ? 'code' : 'doc'} size={15} />
+                  <span>{isSourceCode ? '소스 코드' : '텍스트'}</span>
+                </div>
+                <span>{formatBytes(file.size)}</span>
+              </div>
+              {textContent.length > 0 ? (
+                <pre className={'viewer-text-content' + (isSourceCode ? ' code' : '')}><code>{textContent}</code></pre>
+              ) : (
+                <div className="viewer-empty-text">빈 파일입니다.</div>
+              )}
+            </div>
+          ) : previewLoading ? (
+            <div className="viewer-loader"><Icon name="spinner" size={28} /><span>파일을 불러오는 중...</span></div>
+          ) : null
         ) : (
           <div className="viewer-fallback">
             <div className="icon-wrap">
@@ -143,6 +363,25 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PreviewError({ message, onDownload, downloading }: {
+  message: string;
+  onDownload: () => void;
+  downloading: boolean;
+}) {
+  return (
+    <div className="viewer-fallback">
+      <div className="icon-wrap">
+        <Icon name="warn" size={48} stroke={1.2} />
+      </div>
+      <h3>미리보기를 불러올 수 없습니다</h3>
+      <p>{message}</p>
+      <button className="vbtn-action" onClick={onDownload} disabled={downloading}>
+        <Icon name={downloading ? 'spinner' : 'download'} size={16} /> {downloading ? '다운로드 중...' : '다운로드 받기'}
+      </button>
     </div>
   );
 }
@@ -339,6 +578,64 @@ const viewerStyles = `
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .viewer-text-wrap {
+    width: min(100%, 1120px);
+    height: 82vh;
+    min-width: 0;
+    display: grid;
+    grid-template-rows: 42px 1fr;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #11131a;
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .viewer-text-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 0 14px;
+    background: #191c26;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    color: #aeb4c2;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .viewer-text-kind {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    color: #eef1f6;
+    font-weight: 600;
+  }
+  .viewer-text-content {
+    margin: 0;
+    padding: 18px 20px 28px;
+    min-width: 0;
+    overflow: auto;
+    color: #e7eaf0;
+    background: #0f1015;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    tab-size: 2;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .viewer-text-content.code {
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  .viewer-empty-text {
+    display: grid;
+    place-items: center;
+    color: #8f96a3;
+    background: #0f1015;
+    font-size: 14px;
   }
   .viewer-fallback {
     display: flex;
