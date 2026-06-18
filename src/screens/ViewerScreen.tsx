@@ -438,7 +438,11 @@ const viewerStyles = `
   .viewer-page {
     display: grid;
     grid-template-rows: 56px 1fr;
+    width: 100%;
+    min-width: 0;
+    max-width: 100vw;
     height: 100vh;
+    overflow: hidden;
     background: #0f1015;
     color: #fff;
     font-family: inherit;
@@ -447,12 +451,15 @@ const viewerStyles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
+    min-width: 0;
     padding: 0 20px;
+    box-sizing: border-box;
     background: #161822;
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
     z-index: 10;
   }
   .vbtn-back {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -470,8 +477,11 @@ const viewerStyles = `
     background: rgba(255, 255, 255, 0.12);
   }
   .viewer-title {
+    flex: 1 1 auto;
+    min-width: 0;
     text-align: center;
     max-width: 50%;
+    margin: 0 12px;
   }
   .viewer-title .t {
     font-size: 14.5px;
@@ -487,6 +497,7 @@ const viewerStyles = `
     margin-top: 2px;
   }
   .viewer-actions {
+    flex: 0 0 auto;
     display: flex;
     gap: 8px;
   }
@@ -516,6 +527,7 @@ const viewerStyles = `
   .viewer-body {
     display: grid;
     place-items: center;
+    min-width: 0;
     background: #0f1015;
     overflow: hidden;
     position: relative;
