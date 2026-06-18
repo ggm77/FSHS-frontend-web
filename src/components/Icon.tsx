@@ -13,6 +13,7 @@ const PATHS: Record<string, string> = {
   folder:      '<path d="M3 6.5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   folderOpen:  '<path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v1H3z"/><path d="M3 9h18l-1.5 9a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5z"/>',
   doc:         '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+  presentation:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 9h8M8 12h5M12 17v4M8 21l4-4 4 4"/>',
   image:       '<rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="m21 16-5-5L5 21"/>',
   videoFile:   '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none"/>',
   audioFile:   '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',

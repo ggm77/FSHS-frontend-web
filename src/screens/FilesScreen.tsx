@@ -77,13 +77,15 @@ function getFolderHashUrl(folderId: number, rootFolderId: number | null): string
 }
 
 function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number }) {
-  const iconName = file.extension === 'pdf' ? 'pdf'
-    : file.extension === 'zip' || file.extension === 'rar' || file.extension === '7z' ? 'archive'
-    : file.extension === 'tsx' || file.extension === 'ts' || file.extension === 'js' ? 'code'
-    : file.extension === 'docx' || file.extension === 'doc' ? 'doc'
+  const extension = file.extension.toLowerCase();
+  const iconName = extension === 'pdf' ? 'pdf'
+    : extension === 'zip' || extension === 'rar' || extension === '7z' ? 'archive'
+    : extension === 'tsx' || extension === 'ts' || extension === 'js' ? 'code'
+    : extension === 'pptx' || extension === 'pptm' || extension === 'ppt' ? 'presentation'
+    : extension === 'docx' || extension === 'docm' || extension === 'doc' ? 'doc'
     : CATEGORY_ICON[file.category] || 'doc';
 
-  const color = file.extension === 'pdf' ? 'var(--c-pdf)'
+  const color = extension === 'pdf' ? 'var(--c-pdf)'
     : file.category === 'IMAGE' ? 'var(--c-image)'
     : file.category === 'VIDEO' ? 'var(--c-video)'
     : file.category === 'AUDIO' ? 'var(--c-audio)'
