@@ -124,12 +124,13 @@ function FileThumbnail({ file, size = 20, root, eager, isScrollingRef, settleCal
   useEffect(() => {
     if (!visible || loaded || !hasThumbnail) return;
     if (!isScrollingRef?.current) {
-      setLoaded(true);
-      return;
+      const frameId = window.requestAnimationFrame(() => setLoaded(true));
+      return () => window.cancelAnimationFrame(frameId);
     }
     const load = () => setLoaded(true);
-    settleCallbacksRef?.current.add(load);
-    return () => { settleCallbacksRef?.current.delete(load); };
+    const settleCallbacks = settleCallbacksRef?.current;
+    settleCallbacks?.add(load);
+    return () => { settleCallbacks?.delete(load); };
   }, [visible, loaded, hasThumbnail, isScrollingRef, settleCallbacksRef]);
 
   if (!hasThumbnail || failed) return <FileIcon file={file} size={size} />;
@@ -938,20 +939,27 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                     </div>
                   ))}
                   {/* Files next */}
-                  {sortedFiles.map((f) => (
+                  {sortedFiles.map((f, i) => (
                     <div className="grid-card" key={`file-${f.id}`}
                       onClick={() => handleOpenFile(f)}>
                       <div className="gc-head">
                         <FileIcon file={f} size={18} />
                         <span className="nm">{f.name}</span>
                       </div>
-                      <div className="gc-prev" style={
-                        f.category === 'VIDEO' ? { background: 'linear-gradient(135deg, #2a2730, #19171d)' } : {}
-                      }>
-                        {f.category === 'VIDEO'
-                          ? <Icon name="play" size={34} color="#fff" stroke={1.5} />
-                          : <FileIcon file={f} size={40} />
-                        }
+                      <div className="gc-prev">
+                        <FileThumbnail
+                          file={f}
+                          size={40}
+                          root={filesContentRef.current}
+                          eager={i < 20}
+                          isScrollingRef={isScrollingRef}
+                          settleCallbacksRef={settleCallbacksRef}
+                        />
+                        {f.category === 'VIDEO' && (
+                          <span className="gc-video-badge">
+                            <Icon name="play" size={20} color="#fff" stroke={1.5} />
+                          </span>
+                        )}
                       </div>
                       <div className="grid-card-actions">
                         <button className="grid-action-btn" title="다운로드" onClick={e => handleDownloadFile(f, e)} disabled={downloadingKey !== null}>
@@ -1365,6 +1373,21 @@ const filesStyles = `
   .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .grid-card .gc-prev{ height:124px; margin:0 12px 12px; border-radius:8px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
+  .grid-card .gc-video-badge{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    padding-left:2px;
+    background:rgba(15, 16, 21, .68);
+    border:1px solid rgba(255, 255, 255, .42);
+    box-shadow:0 4px 16px rgba(0, 0, 0, .28);
+    pointer-events:none;
+  }
 
   @media (max-width: 768px) {
     .files-toolbar .spacer{
