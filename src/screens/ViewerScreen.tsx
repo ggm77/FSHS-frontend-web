@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { getFile, getFileContentUrl, formatBytes, downloadFileContent } from '../api/files';
@@ -182,6 +183,9 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState('');
+  const [heicBlobUrl, setHeicBlobUrl] = useState<string | null>(null);
+  const [heicConverting, setHeicConverting] = useState(false);
+  const [heicError, setHeicError] = useState('');
 
   useEffect(() => {
     if (!fileId) return;
@@ -190,6 +194,8 @@ export function ViewerScreen({ fileId, onBack }: Props) {
     setBlobUrl(null);
     setTextContent(null);
     setPreviewError('');
+    setHeicBlobUrl(null);
+    setHeicError('');
     getFile(fileId)
       .then(f => setFile(f))
       .catch(() => {})
@@ -197,10 +203,11 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   }, [fileId]);
 
   const isImage = file?.category === 'IMAGE';
-  const isPdf = normalizeExtension(file?.extension) === 'pdf';
+  const extension = normalizeExtension(file?.extension);
+  const isHeic = isImage && (extension === 'heic' || extension === 'heif');
+  const isPdf = extension === 'pdf';
   const isTextDocument = isPreviewableTextDocument(file);
   const isSourceCode = file ? isSourceCodeDocument(file) : false;
-  const extension = normalizeExtension(file?.extension);
   const officePreviewKind: OfficePreviewKind | null = WORD_DOCUMENT_EXTENSIONS.has(extension)
     ? 'word'
     : POWERPOINT_EXTENSIONS.has(extension)
@@ -259,6 +266,47 @@ export function ViewerScreen({ fileId, onBack }: Props) {
       setTextContent(null);
     };
   }, [file, fileId, isPdf, isTextDocument]);
+
+  useEffect(() => {
+    setHeicBlobUrl(null);
+    setHeicError('');
+    setHeicConverting(false);
+
+    if (!file || !fileId || !isHeic) return;
+
+    let cancelled = false;
+    let objectUrl: string;
+    const controller = new AbortController();
+
+    setHeicConverting(true);
+
+    fetch(getFileContentUrl(fileId, false), { credentials: 'include', signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.blob();
+      })
+      .then(blob => heic2any({ blob, toType: 'image/jpeg', quality: 0.92 }))
+      .then(result => {
+        if (cancelled) return;
+        const converted = Array.isArray(result) ? result[0] : result;
+        objectUrl = URL.createObjectURL(converted);
+        setHeicBlobUrl(objectUrl);
+      })
+      .catch(err => {
+        if (controller.signal.aborted || cancelled) return;
+        setHeicError(err instanceof Error ? err.message : 'HEIC 변환 실패');
+      })
+      .finally(() => {
+        if (!cancelled) setHeicConverting(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setHeicBlobUrl(null);
+    };
+  }, [file, fileId, isHeic]);
 
   if (fileId == null) return null;
 
@@ -333,9 +381,24 @@ export function ViewerScreen({ fileId, onBack }: Props) {
         ) : !file ? (
           <div className="viewer-error">파일 정보를 불러올 수 없습니다.</div>
         ) : isImage ? (
-          <div className="viewer-media-wrap">
-            <img src={fileUrl} alt={file.name} className="viewer-img" />
-          </div>
+          isHeic ? (
+            heicConverting ? (
+              <div className="viewer-loader">
+                <Icon name="spinner" size={28} />
+                <span>HEIC 변환 중...</span>
+              </div>
+            ) : heicError ? (
+              <PreviewError message={`HEIC 변환 실패: ${heicError}`} onDownload={handleDownload} downloading={downloading} />
+            ) : heicBlobUrl ? (
+              <div className="viewer-media-wrap">
+                <img src={heicBlobUrl} alt={file.name} className="viewer-img" />
+              </div>
+            ) : null
+          ) : (
+            <div className="viewer-media-wrap">
+              <img src={fileUrl} alt={file.name} className="viewer-img" />
+            </div>
+          )
         ) : isPdf ? (
           previewError ? (
             <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
