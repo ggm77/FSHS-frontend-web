@@ -212,7 +212,10 @@ function countSyncResult(result: FolderSyncResponseDto): number {
 export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [folder, setFolder] = useState<FolderResponseDto | null>(null);
   const [path, setPath] = useState<FolderPathItem[]>([]);
-  const [view, setView] = useState<'list' | 'grid'>('list');
+  const [view, setView] = useState<'list' | 'grid'>(() => {
+    const saved = localStorage.getItem('files-view');
+    return saved === 'grid' ? 'grid' : 'list';
+  });
   const [sortKey, setSortKey] = useState<FileSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selected, setSelected] = useState<number | null>(null);
@@ -834,8 +837,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             </div>
           </div>
           <div className="view-toggle">
-            <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}><Icon name="list" size={18} /></button>
-            <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}><Icon name="grid" size={16} /></button>
+            <button className={view === 'list' ? 'on' : ''} onClick={() => { setView('list'); localStorage.setItem('files-view', 'list'); }}><Icon name="list" size={18} /></button>
+            <button className={view === 'grid' ? 'on' : ''} onClick={() => { setView('grid'); localStorage.setItem('files-view', 'grid'); }}><Icon name="grid" size={16} /></button>
           </div>
         </div>
 
