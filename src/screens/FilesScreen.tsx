@@ -216,8 +216,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     const saved = localStorage.getItem('files-view');
     return saved === 'grid' ? 'grid' : 'list';
   });
-  const [sortKey, setSortKey] = useState<FileSortKey>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortKey, setSortKey] = useState<FileSortKey>(() => {
+    return (localStorage.getItem('files-sort-key') as FileSortKey) || 'name';
+  });
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    return (localStorage.getItem('files-sort-dir') as SortDirection) || 'asc';
+  });
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -704,10 +708,15 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   function handleSortOptionClick(key: FileSortKey) {
     if (key === sortKey) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      const newDir = sortDirection === 'asc' ? 'desc' : 'asc';
+      setSortDirection(newDir);
+      localStorage.setItem('files-sort-dir', newDir);
     } else {
+      const newDir = key === 'name' ? 'asc' : 'desc';
       setSortKey(key);
-      setSortDirection(key === 'name' ? 'asc' : 'desc');
+      setSortDirection(newDir);
+      localStorage.setItem('files-sort-key', key);
+      localStorage.setItem('files-sort-dir', newDir);
     }
   }
 
