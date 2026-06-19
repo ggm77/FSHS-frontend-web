@@ -929,13 +929,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                 <div className="file-grid">
                   {/* Folders first */}
                   {sortedFolders.map((f) => (
-                    <div className="grid-card" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
+                    <div className="grid-card gc-folder" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
                       <div className="gc-head">
                         <Icon name="folder" size={18} color="var(--c-folder)" stroke={1.7} />
                         <span className="nm">{f.name}</span>
-                      </div>
-                      <div className="gc-prev">
-                        <Icon name="folder" size={40} color="var(--c-folder)" stroke={1.7} />
                       </div>
                       <div className="grid-card-actions">
                         <button className="grid-action-btn" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
@@ -1385,6 +1382,8 @@ const filesStyles = `
   .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .grid-card .gc-prev{ height:124px; margin:0 12px 12px; border-radius:8px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
+  .grid-card.gc-folder .gc-head{ padding:10px 12px; }
+  .grid-card.gc-folder{ cursor:pointer; }
   .grid-card .gc-video-badge{
     position:absolute;
     inset:0;
