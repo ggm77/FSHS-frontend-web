@@ -11,6 +11,7 @@ export function LoginScreen({ onSignIn }: Props) {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [mode, setMode] = useState<'login' | 'setup'>('login');
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -19,7 +20,7 @@ export function LoginScreen({ onSignIn }: Props) {
     setLoading(true);
     setError('');
     try {
-      await login(username, password);
+      await login(username, password, rememberMe);
       onSignIn(username);
     } catch {
       setError('아이디 또는 비밀번호가 올바르지 않습니다.');
@@ -92,7 +93,7 @@ export function LoginScreen({ onSignIn }: Props) {
             </div>
             {error && <div style={{ fontSize: 13, color: 'var(--bad)', marginBottom: 8 }}>{error}</div>}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--fg-2)', margin: '4px 0 8px' }}>
-              <input type="checkbox" defaultChecked /> 30일 동안 로그인 유지
+              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} /> 30일 동안 로그인 유지
             </label>
             <div className="login-actions">
               <button className="link-btn" onClick={() => setMode('setup')}>초기 설정</button>

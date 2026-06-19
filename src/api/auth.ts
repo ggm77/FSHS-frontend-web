@@ -1,7 +1,8 @@
 import { BASE, createApiErrorFromResponse, getCookie } from './client';
 
-export async function login(username: string, password: string): Promise<void> {
+export async function login(username: string, password: string, rememberMe = false): Promise<void> {
   const body = new URLSearchParams({ username, password });
+  if (rememberMe) body.set('remember-me', 'true');
   const xsrfToken = getCookie('XSRF-TOKEN');
   const headers: Record<string, string> = {};
   if (xsrfToken) {
