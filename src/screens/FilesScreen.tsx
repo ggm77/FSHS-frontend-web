@@ -933,7 +933,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                 <div className="file-grid-sections">
                   {sortedFolders.length > 0 && (
                     <div className="gc-section">
-                      <div className="gc-section-label">폴더</div>
                       <div className="file-grid">
                         {sortedFolders.map((f) => (
                           <div className="grid-card gc-folder" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
@@ -959,7 +958,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   )}
                   {sortedFiles.length > 0 && (
                     <div className="gc-section">
-                      <div className="gc-section-label">파일</div>
                       <div className="file-grid">
                   {sortedFiles.map((f, i) => (
                     <div className="grid-card" key={`file-${f.id}`}
@@ -1394,8 +1392,7 @@ const filesStyles = `
   .row-action:disabled{ opacity:.5; cursor:not-allowed; }
 
   .file-grid-sections{ display:flex; flex-direction:column; gap:24px; }
-  .gc-section-label{ font-size:12px; font-weight:600; color:var(--fg-3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; }
-  .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
+.file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
   .grid-card{ border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; cursor:default; background:var(--bg); box-shadow:var(--shadow-sm); }
   .grid-card:hover{ box-shadow:var(--shadow-md); transform:translateY(-1px); }
   .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
