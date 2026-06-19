@@ -930,28 +930,37 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="file-grid">
-                  {/* Folders first */}
-                  {sortedFolders.map((f) => (
-                    <div className="grid-card gc-folder" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
-                      <div className="gc-head">
-                        <Icon name="folder" size={18} color="var(--c-folder)" stroke={1.7} />
-                        <span className="nm">{f.name}</span>
-                      </div>
-                      <div className="grid-card-actions">
-                        <button className="grid-action-btn" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
-                          <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
-                        </button>
-                        <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
-                          <Icon name="move" size={14} />
-                        </button>
-                        <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
-                          <Icon name="trash" size={14} />
-                        </button>
+                <div className="file-grid-sections">
+                  {sortedFolders.length > 0 && (
+                    <div className="gc-section">
+                      <div className="gc-section-label">폴더</div>
+                      <div className="file-grid">
+                        {sortedFolders.map((f) => (
+                          <div className="grid-card gc-folder" key={`folder-${f.id}`} onClick={() => navigateTo(f)}>
+                            <div className="gc-head">
+                              <Icon name="folder" size={18} color="var(--c-folder)" stroke={1.7} />
+                              <span className="nm">{f.name}</span>
+                            </div>
+                            <div className="grid-card-actions">
+                              <button className="grid-action-btn" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
+                                <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
+                              </button>
+                              <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
+                                <Icon name="move" size={14} />
+                              </button>
+                              <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
+                                <Icon name="trash" size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                  {/* Files next */}
+                  )}
+                  {sortedFiles.length > 0 && (
+                    <div className="gc-section">
+                      <div className="gc-section-label">파일</div>
+                      <div className="file-grid">
                   {sortedFiles.map((f, i) => (
                     <div className="grid-card" key={`file-${f.id}`}
                       onClick={() => handleOpenFile(f)}>
@@ -988,6 +997,9 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       </div>
                     </div>
                   ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             ) : (
@@ -1381,6 +1393,8 @@ const filesStyles = `
   .row-action:hover{ background:var(--surface-2); color:var(--accent); }
   .row-action:disabled{ opacity:.5; cursor:not-allowed; }
 
+  .file-grid-sections{ display:flex; flex-direction:column; gap:24px; }
+  .gc-section-label{ font-size:12px; font-weight:600; color:var(--fg-3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:10px; }
   .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
   .grid-card{ border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; cursor:default; background:var(--bg); box-shadow:var(--shadow-sm); }
   .grid-card:hover{ box-shadow:var(--shadow-md); transform:translateY(-1px); }
