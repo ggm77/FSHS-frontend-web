@@ -95,13 +95,14 @@ function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number })
   return <Icon name={iconName} size={size} color={color} stroke={1.7} />;
 }
 
-function FileThumbnail({ file, size = 20, root, eager, isScrollingRef, settleCallbacksRef }: {
+function FileThumbnail({ file, size = 20, root, eager, isScrollingRef, settleCallbacksRef, fill }: {
   file: FileResponseDto;
   size?: number;
   root?: Element | null;
   eager?: boolean;
   isScrollingRef?: React.MutableRefObject<boolean>;
   settleCallbacksRef?: React.MutableRefObject<Set<() => void>>;
+  fill?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -136,12 +137,15 @@ function FileThumbnail({ file, size = 20, root, eager, isScrollingRef, settleCal
   if (!hasThumbnail || failed) return <FileIcon file={file} size={size} />;
 
   return (
-    <div ref={ref} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div ref={ref} style={fill
+      ? { position: 'absolute', inset: 0 }
+      : { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+    }>
       {loaded ? (
         <img
           src={getFileThumbnailUrl(file.uuid)}
           alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }}
           onError={() => setFailed(true)}
         />
       ) : (
@@ -963,6 +967,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                           eager={i < 20}
                           isScrollingRef={isScrollingRef}
                           settleCallbacksRef={settleCallbacksRef}
+                          fill
                         />
                         {f.category === 'VIDEO' && (
                           <span className="gc-video-badge">
