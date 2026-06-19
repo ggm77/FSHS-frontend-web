@@ -201,7 +201,6 @@ function Sidebar({
         <img src="/logo.png" alt="FSHS" className="sb-logo-img" />
         <div>
           <div className="name">FSHS</div>
-          <div className="host">fshs.seohamin.com</div>
         </div>
       </button>
       <nav className="sb-nav">

@@ -100,10 +100,6 @@ export function LoginScreen({ onSignIn }: Props) {
                 {loading ? '로그인 중...' : '로그인'}
               </button>
             </div>
-            <div className="session-host">
-              <div className="dot" />
-              fshs.seohamin.com
-            </div>
           </div>
         ) : (
           <div className="login-right">
