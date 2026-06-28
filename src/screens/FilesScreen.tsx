@@ -1417,6 +1417,19 @@ const filesStyles = `
   }
 
   @media (max-width: 768px) {
+    .file-grid{
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+    }
+    .grid-card .gc-head{
+      padding:10px 10px 8px;
+      gap:7px;
+      font-size:12.5px;
+    }
+    .grid-card .gc-prev{
+      height:104px;
+      margin:0 10px 10px;
+    }
     .files-toolbar .spacer{
       flex:0 0 0;
       width:0;
@@ -1943,7 +1956,13 @@ const filesStyles = `
   }
   @media (max-width: 768px) {
     .grid-card-actions {
+      position: static;
+      justify-content: flex-end;
+      padding: 0 10px 10px;
       opacity: 1;
+    }
+    .grid-action-btn:hover {
+      transform: none;
     }
   }
 `;
