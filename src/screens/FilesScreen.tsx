@@ -1240,8 +1240,9 @@ const filesStyles = `
     overflow-x:auto;
   }
   .files-toolbar{
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
     padding:0 0 14px;
+    overflow-x:visible;
   }
   .files-toolbar .spacer{ flex:1; }
   .sync-current-btn{
@@ -1282,6 +1283,7 @@ const filesStyles = `
   }
   .sort-controls{
     display:flex; align-items:center; gap:8px;
+    flex:0 0 auto;
   }
   .sort-label{
     font-size:12px;
@@ -1304,6 +1306,9 @@ const filesStyles = `
     font-size:12px;
     font-weight:650;
     white-space:nowrap;
+  }
+  .view-toggle{
+    flex:0 0 auto;
   }
   .sort-custom-btn:hover{
     background:var(--surface-1);
@@ -1431,8 +1436,8 @@ const filesStyles = `
       margin:0 10px 10px;
     }
     .files-toolbar .spacer{
-      flex:0 0 0;
-      width:0;
+      flex:1 1 auto;
+      min-width:8px;
     }
     .sort-controls{
       flex:0 0 auto;
@@ -1458,10 +1463,6 @@ const filesStyles = `
     }
     .files-toolbar > .sync-current-btn .sync-btn-label{
       display:none;
-    }
-    .files-toolbar{
-      flex-wrap:nowrap;
-      overflow-x:auto;
     }
     .files-toolbar > *{
       flex-shrink:0;
