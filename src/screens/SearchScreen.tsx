@@ -189,6 +189,10 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
   const menuRef = useRef<HTMLDivElement>(null);
   const trimmedQuery = query.trim();
 
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
   const runSearch = useCallback(async (nextPage: number, mode: SearchMode) => {
     const requestId = requestSeqRef.current + 1;
     requestSeqRef.current = requestId;

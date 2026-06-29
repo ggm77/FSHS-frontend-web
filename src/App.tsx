@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import './styles.css';
 import { Icon } from './components/Icon';
@@ -303,8 +303,11 @@ function Sidebar({
   );
 }
 
-function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
-  onSearch: () => void;
+function TopBar({ searchValue, onSearchValueChange, onSearch, searchInputRef, dark, onToggleDark, onLogout, onMenuClick }: {
+  searchValue: string;
+  onSearchValueChange: (value: string) => void;
+  onSearch: (query: string) => void;
+  searchInputRef: React.RefObject<HTMLInputElement>;
   dark: boolean;
   onToggleDark: () => void;
   onLogout: () => void;
@@ -317,11 +320,21 @@ function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
       </button>
       <div className="mobile-title">FSHS</div>
       <div className="tb-spacer" />
-      <div className="tb-search" onClick={onSearch}>
+      <form
+        className="tb-search"
+        onClick={() => searchInputRef.current?.focus()}
+        onSubmit={e => { e.preventDefault(); onSearch(searchValue); }}
+      >
         <Icon name="search" size={16} />
-        <span className="t">전체 폴더 검색</span>
+        <input
+          ref={searchInputRef}
+          value={searchValue}
+          onChange={e => onSearchValueChange(e.target.value)}
+          placeholder="전체 폴더 검색"
+          aria-label="전체 폴더 검색"
+        />
         <kbd>⌘K</kbd>
-      </div>
+      </form>
       <button className="tb-icon" title={dark ? '라이트 모드' : '다크 모드'} onClick={onToggleDark}>
         <Icon name={dark ? 'sun' : 'moon'} size={18} />
       </button>
@@ -342,6 +355,8 @@ export default function App() {
   // 목록에서 이미 받아 둔 파일 정보. 비디오 페이지가 메타데이터 재요청 없이 바로 재생을 시작하게 해준다.
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [topSearchQuery, setTopSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   function navigateToScreen(nextScreen: Screen, mode: 'push' | 'replace' = 'replace') {
     setScreen(nextScreen);
@@ -432,6 +447,7 @@ export default function App() {
         // 미디어 하위 페이지에서는 메인 화면이 보이지 않으므로 무시한다.
         if (parseMediaRoute(window.location.pathname)) return;
         navigateToScreen('search');
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -511,6 +527,11 @@ export default function App() {
     navigateToScreen(id as Screen);
   }
 
+  function handleTopSearch(query: string) {
+    setTopSearchQuery(query);
+    navigateToScreen('search');
+  }
+
   function handleRootClick() {
     const alreadyAtRootDirectory = screen === 'files'
       && window.location.pathname === '/'
@@ -576,7 +597,10 @@ export default function App() {
         <Sidebar active={screen} onNav={handleNav} onRootClick={handleRootClick} user={user} className={sidebarOpen ? 'open' : ''} />
         <main className="main">
           <TopBar
-            onSearch={() => navigateToScreen('search')}
+            searchValue={topSearchQuery}
+            onSearchValueChange={setTopSearchQuery}
+            onSearch={handleTopSearch}
+            searchInputRef={searchInputRef}
             dark={dark}
             onToggleDark={() => setDark(v => !v)}
             onLogout={handleLogout}
@@ -584,7 +608,7 @@ export default function App() {
           />
           {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-          {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+          {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} initialQuery={topSearchQuery} />}
           {screen === 'share'   && <ShareScreen currentUserId={user?.id ?? null} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
           {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
