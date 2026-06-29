@@ -1,9 +1,37 @@
 import { request, getCookie, createApiErrorFromBody } from './client';
 import { downloadUrl, type DownloadProgress } from './download';
-import type { FileResponseDto, FileStatusDto } from '../types';
+import type { FileCategory, FileResponseDto, FileStatusDto } from '../types';
+
+export type FileSearchSortKey = 'name' | 'size' | 'originUpdatedAt' | 'updatedAt';
+export type FileSearchOrder = 'asc' | 'desc';
+
+export interface FileSearchParams {
+  query: string;
+  category?: FileCategory;
+  sort?: FileSearchSortKey;
+  order?: FileSearchOrder;
+  size?: number;
+  page?: number;
+}
+
+export interface FileSearchResponse {
+  hasNext: boolean;
+  items: FileResponseDto[];
+}
 
 export function getFile(fileId: number): Promise<FileResponseDto> {
   return request(`/files/${fileId}`);
+}
+
+export function searchFiles(params: FileSearchParams): Promise<FileSearchResponse> {
+  const query = new URLSearchParams();
+  query.set('query', params.query);
+  if (params.category) query.set('category', params.category);
+  if (params.sort) query.set('sort', params.sort);
+  if (params.order) query.set('order', params.order);
+  if (params.size != null) query.set('size', String(params.size));
+  if (params.page != null) query.set('page', String(params.page));
+  return request(`/files?${query.toString()}`);
 }
 
 export function getFileStatus(fileUuid: string): Promise<FileStatusDto> {
