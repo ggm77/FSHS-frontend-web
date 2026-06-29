@@ -20,17 +20,86 @@ import type { UserResponseDto, FileResponseDto } from './types';
 type Screen = 'files' | 'gallery' | 'search' | 'share' | 'users' | 'settings' | 'admin' | 'transcoding';
 
 // 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
-// 경로형 URL이므로 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
+// 화면 경로와 미디어 경로 모두 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
 type MediaRoute = { type: 'video' | 'viewer'; fileId: number } | null;
 const LOGIN_PATH = '/login';
+const SCREEN_STORAGE_KEY = 'last-screen';
 const LIGHT_THEME_COLOR = '#ffffff';
 const DARK_THEME_COLOR = '#151922';
 const VIDEO_THEME_COLOR = '#10131d';
 const VIEWER_THEME_COLOR = '#0f1015';
 let shellChromeUpdateId = 0;
 
+const SCREEN_PATHS: Record<Screen, string> = {
+  files: '/',
+  gallery: '/gallery',
+  search: '/search',
+  share: '/share',
+  users: '/users',
+  settings: '/settings',
+  admin: '/admin',
+  transcoding: '/transcoding',
+};
+
+const ROUTE_SCREENS = new Set<Screen>(Object.keys(SCREEN_PATHS) as Screen[]);
+
 function isLoginRoute(pathname: string): boolean {
   return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
+}
+
+function isScreen(value: unknown): value is Screen {
+  return typeof value === 'string' && ROUTE_SCREENS.has(value as Screen);
+}
+
+function getScreenPath(screen: Screen): string {
+  return SCREEN_PATHS[screen];
+}
+
+function normalizePathname(pathname: string): string {
+  const normalized = pathname.replace(/\/+$/, '');
+  return normalized || '/';
+}
+
+function getScreenFromPath(pathname: string): Screen | null {
+  const normalized = normalizePathname(pathname);
+  if (normalized === '/files') return 'files';
+
+  for (const [screen, path] of Object.entries(SCREEN_PATHS) as [Screen, string][]) {
+    if (normalized === normalizePathname(path)) return screen;
+  }
+  return null;
+}
+
+function getScreenFromPathLike(path: string): Screen | null {
+  try {
+    return getScreenFromPath(new URL(path, window.location.origin).pathname);
+  } catch {
+    return null;
+  }
+}
+
+function getScreenFromHistoryState(state: unknown): Screen | null {
+  if (typeof state !== 'object' || state === null) return null;
+  const record = state as Record<string, unknown>;
+  if (isScreen(record.screen)) return record.screen;
+  if (record.type === 'folder') return 'files';
+  return null;
+}
+
+function loadStoredScreen(): Screen {
+  const stored = localStorage.getItem(SCREEN_STORAGE_KEY);
+  return isScreen(stored) ? stored : 'files';
+}
+
+function saveStoredScreen(screen: Screen) {
+  localStorage.setItem(SCREEN_STORAGE_KEY, screen);
+}
+
+function getInitialScreen(): Screen {
+  if (parseMediaRoute(window.location.pathname)) return loadStoredScreen();
+  return getScreenFromPath(window.location.pathname)
+    ?? getScreenFromHistoryState(window.history.state)
+    ?? loadStoredScreen();
 }
 
 function getCurrentLocationPath(): string {
@@ -265,7 +334,7 @@ function TopBar({ onSearch, dark, onToggleDark, onLogout, onMenuClick }: {
 
 export default function App() {
   const [authed, setAuthed] = useState(() => loadCachedUser() !== null);
-  const [screen, setScreen] = useState<Screen>('files');
+  const [screen, setScreen] = useState<Screen>(getInitialScreen);
   const [dark, setDark] = useState(getInitialDarkMode);
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
@@ -285,10 +354,16 @@ export default function App() {
   }, [dark, mediaRoute]);
 
   useEffect(() => {
+    if (loginRoute) return;
+    saveStoredScreen(screen);
+  }, [loginRoute, screen]);
+
+  useEffect(() => {
     // Initialize history state on mount
     if (!window.history.state) {
+      const initialScreen = getInitialScreen();
       window.history.replaceState(
-        loginRoute ? { screen: 'login', redirectTo: '/' } : { screen: 'files' },
+        loginRoute ? { screen: 'login', redirectTo: getScreenPath(initialScreen) } : { screen: initialScreen },
         '',
       );
     }
@@ -308,13 +383,11 @@ export default function App() {
       setMediaRoute(route);
       if (!route) {
         setVideoFile(null);
-        const state = window.history.state;
-        if (state && state.screen) {
-          setScreen(state.screen as Screen);
-        } else if (state && state.type === 'folder') {
-          // FilesScreen이 push한 폴더 탐색 항목
-          setScreen('files');
-        }
+        const nextScreen = getScreenFromPath(window.location.pathname)
+          ?? getScreenFromHistoryState(window.history.state)
+          ?? loadStoredScreen();
+        setScreen(nextScreen);
+        saveStoredScreen(nextScreen);
       }
     };
 
@@ -330,7 +403,8 @@ export default function App() {
       if (!isLogin) return;
 
       const target = getHistoryRedirectTo();
-      window.history.replaceState({ screen: 'files' }, '', target);
+      const targetScreen = getScreenFromPathLike(target) ?? loadStoredScreen();
+      window.history.replaceState({ screen: targetScreen }, '', target);
       window.dispatchEvent(new PopStateEvent('popstate'));
       return;
     }
@@ -348,7 +422,7 @@ export default function App() {
         e.preventDefault();
         // 미디어 하위 페이지에서는 메인 화면이 보이지 않으므로 무시한다.
         if (parseMediaRoute(window.location.pathname)) return;
-        setScreen('search');
+        navigateToScreen('search');
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -425,8 +499,15 @@ export default function App() {
   function handleNav(id: string) {
     if (id === 'logout') { handleLogout(); return; }
     if (id === 'files') { handleRootClick(); return; }
-    setScreen(id as Screen);
-    window.history.replaceState({ screen: id }, '');
+    navigateToScreen(id as Screen);
+  }
+
+  function navigateToScreen(nextScreen: Screen, mode: 'push' | 'replace' = 'replace') {
+    setScreen(nextScreen);
+    saveStoredScreen(nextScreen);
+    const url = getScreenPath(nextScreen);
+    if (mode === 'push') window.history.pushState({ screen: nextScreen }, '', url);
+    else window.history.replaceState({ screen: nextScreen }, '', url);
     setSidebarOpen(false);
   }
 
@@ -437,6 +518,7 @@ export default function App() {
       && window.location.hash === '';
 
     setScreen('files');
+    saveStoredScreen('files');
     setSidebarOpen(false);
     if (alreadyAtRootDirectory) {
       window.history.replaceState({ screen: 'files' }, '', '/');
@@ -471,7 +553,7 @@ export default function App() {
       window.history.back();
     } else {
       // 공유 링크 등으로 미디어 페이지에 바로 들어온 경우: 돌아갈 항목이 없으니 메인으로 교체한다.
-      window.history.replaceState({ screen }, '', '/');
+      window.history.replaceState({ screen }, '', getScreenPath(screen));
       setMediaRoute(null);
       setVideoFile(null);
     }
@@ -494,7 +576,7 @@ export default function App() {
         <Sidebar active={screen} onNav={handleNav} onRootClick={handleRootClick} user={user} className={sidebarOpen ? 'open' : ''} />
         <main className="main">
           <TopBar
-            onSearch={() => setScreen('search')}
+            onSearch={() => navigateToScreen('search')}
             dark={dark}
             onToggleDark={() => setDark(v => !v)}
             onLogout={handleLogout}
