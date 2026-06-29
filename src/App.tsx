@@ -485,45 +485,41 @@ export default function App() {
     return null;
   }
 
-  if (mediaRoute?.type === 'video') {
-    return (
-      <MediaShell type="video" dark={dark}>
-        <VideoScreen fileId={mediaRoute.fileId} initialFile={videoFile} onBack={handleBack} />
-      </MediaShell>
-    );
-  }
-
-  if (mediaRoute?.type === 'viewer') {
-    return (
-      <MediaShell type="viewer" dark={dark}>
-        <ViewerScreen fileId={mediaRoute.fileId} onBack={handleBack} />
-      </MediaShell>
-    );
-  }
-
   const rootFolderId = user?.rootFolderId ?? null;
 
   return (
-    <div className="app">
-      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-      <Sidebar active={screen} onNav={handleNav} onRootClick={handleRootClick} user={user} className={sidebarOpen ? 'open' : ''} />
-      <main className="main">
-        <TopBar
-          onSearch={() => setScreen('search')}
-          dark={dark}
-          onToggleDark={() => setDark(v => !v)}
-          onLogout={handleLogout}
-          onMenuClick={() => setSidebarOpen(true)}
-        />
-        {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-        {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-        {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-        {screen === 'share'   && <ShareScreen />}
-        {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
-        {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
-        {screen === 'admin'        && <AdminScreen />}
-        {screen === 'transcoding'  && <TranscodingScreen />}
-      </main>
-    </div>
+    <>
+      <div className="app">
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+        <Sidebar active={screen} onNav={handleNav} onRootClick={handleRootClick} user={user} className={sidebarOpen ? 'open' : ''} />
+        <main className="main">
+          <TopBar
+            onSearch={() => setScreen('search')}
+            dark={dark}
+            onToggleDark={() => setDark(v => !v)}
+            onLogout={handleLogout}
+            onMenuClick={() => setSidebarOpen(true)}
+          />
+          {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+          {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+          {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+          {screen === 'share'   && <ShareScreen />}
+          {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
+          {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
+          {screen === 'admin'        && <AdminScreen />}
+          {screen === 'transcoding'  && <TranscodingScreen />}
+        </main>
+      </div>
+      {mediaRoute?.type === 'video' && (
+        <MediaShell type="video" dark={dark}>
+          <VideoScreen fileId={mediaRoute.fileId} initialFile={videoFile} onBack={handleBack} />
+        </MediaShell>
+      )}
+      {mediaRoute?.type === 'viewer' && (
+        <MediaShell type="viewer" dark={dark}>
+          <ViewerScreen fileId={mediaRoute.fileId} onBack={handleBack} />
+        </MediaShell>
+      )}
+    </>
   );
 }

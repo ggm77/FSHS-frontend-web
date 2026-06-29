@@ -84,14 +84,52 @@ function getFileIconColor(file: FileResponseDto): string {
   return 'var(--c-doc)';
 }
 
-function SearchFilePreview({ file }: { file: FileResponseDto }) {
+function SearchFilePreview({ file, root, eager, isScrollingRef, settleCallbacksRef }: {
+  file: FileResponseDto;
+  root?: Element | null;
+  eager?: boolean;
+  isScrollingRef?: React.MutableRefObject<boolean>;
+  settleCallbacksRef?: React.MutableRefObject<Set<() => void>>;
+}) {
   const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [loaded, setLoaded] = useState(eager ?? false);
+  const ref = useRef<HTMLSpanElement>(null);
   const hasThumbnail = file.category === 'IMAGE' || file.category === 'VIDEO';
+
+  useEffect(() => {
+    if (!hasThumbnail || loaded) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { root: root ?? null, rootMargin: '400px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasThumbnail, loaded, root]);
+
+  useEffect(() => {
+    if (!visible || loaded || !hasThumbnail) return;
+    if (!isScrollingRef?.current) {
+      const frameId = window.requestAnimationFrame(() => setLoaded(true));
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    const load = () => setLoaded(true);
+    const settleCallbacks = settleCallbacksRef?.current;
+    settleCallbacks?.add(load);
+    return () => { settleCallbacks?.delete(load); };
+  }, [visible, loaded, hasThumbnail, isScrollingRef, settleCallbacksRef]);
 
   if (hasThumbnail && !failed) {
     return (
-      <span className="search-file-preview media">
-        <img src={getFileThumbnailUrl(file.uuid)} alt="" loading="lazy" onError={() => setFailed(true)} />
+      <span ref={ref} className="search-file-preview media">
+        {loaded ? (
+          <img src={getFileThumbnailUrl(file.uuid)} alt="" loading="lazy" onError={() => setFailed(true)} />
+        ) : (
+          <Icon name={getFileIconName(file)} size={21} color={getFileIconColor(file)} stroke={1.7} />
+        )}
         {file.category === 'VIDEO' && (
           <span className="search-video-badge">
             <Icon name="play" size={10} color="#fff" stroke={1.5} />
@@ -141,6 +179,10 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
   const [openMenu, setOpenMenu] = useState<SearchMenu | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const requestSeqRef = useRef(0);
+  const searchContentRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
+  const settleCallbacksRef = useRef(new Set<() => void>());
   const categoryBtnRef = useRef<HTMLButtonElement>(null);
   const sortBtnRef = useRef<HTMLButtonElement>(null);
   const orderBtnRef = useRef<HTMLButtonElement>(null);
@@ -231,6 +273,55 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [openMenu]);
 
+  useEffect(() => {
+    const el = searchContentRef.current;
+    if (!el) return;
+
+    let lastY = el.scrollTop;
+    let lastT = performance.now();
+    let timer: ReturnType<typeof setTimeout>;
+
+    const settle = () => {
+      isScrollingRef.current = false;
+      settleCallbacksRef.current.forEach(fn => fn());
+      settleCallbacksRef.current.clear();
+    };
+
+    const onScroll = () => {
+      const now = performance.now();
+      const dt = now - lastT;
+      const vel = (dt > 0 && dt < 500) ? Math.abs(el.scrollTop - lastY) / dt : 5;
+      lastY = el.scrollTop;
+      lastT = now;
+
+      clearTimeout(timer);
+      if (vel < 1.5) {
+        timer = setTimeout(settle, 80);
+      } else {
+        isScrollingRef.current = true;
+        timer = setTimeout(settle, 150);
+      }
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(timer); };
+  }, []);
+
+  useEffect(() => {
+    const root = searchContentRef.current;
+    const target = loadMoreRef.current;
+    if (!root || !target || !trimmedQuery || !hasNext || loading || loadingMore || items.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void runSearch(page + 1, 'append');
+      },
+      { root, rootMargin: '360px 0px 360px 0px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasNext, items.length, loading, loadingMore, page, runSearch, trimmedQuery]);
+
   function toggleMenu(menu: SearchMenu, button: HTMLButtonElement | null) {
     if (openMenu === menu) {
       setOpenMenu(null);
@@ -264,7 +355,7 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
   return (
     <>
       <style>{searchStyles}</style>
-      <div className="content search-content">
+      <div ref={searchContentRef} className="content search-content">
         <div className="search-page-head">
           <div>
             <h1>검색</h1>
@@ -388,9 +479,15 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
               {hasNext && <span>더 많은 결과가 있습니다</span>}
             </div>
             <div className="search-list">
-              {items.map(file => (
+              {items.map((file, i) => (
                 <button key={file.id} className="search-row" onClick={() => handleOpenFile(file)}>
-                  <SearchFilePreview file={file} />
+                  <SearchFilePreview
+                    file={file}
+                    root={searchContentRef.current}
+                    eager={i < 20}
+                    isScrollingRef={isScrollingRef}
+                    settleCallbacksRef={settleCallbacksRef}
+                  />
                   <span className="search-row-main">
                     <span className="search-file-name">{file.name}</span>
                     <span className="search-file-path">{formatParentPath(file)}</span>
@@ -405,11 +502,13 @@ export function SearchScreen({ onOpenVideo, onOpenFile, initialQuery = '' }: Pro
               ))}
             </div>
             {hasNext && (
-              <div className="search-more">
-                <button className="btn" onClick={() => void runSearch(page + 1, 'append')} disabled={loadingMore}>
-                  {loadingMore ? <Icon name="spinner" size={15} className="spin-icon" /> : <Icon name="plus" size={15} />}
-                  더 보기
-                </button>
+              <div ref={loadMoreRef} className="search-load-sentinel">
+                {loadingMore && (
+                  <span>
+                    <Icon name="spinner" size={15} className="spin-icon" />
+                    다음 결과를 불러오는 중...
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -669,10 +768,20 @@ const searchStyles = `
     font-variant-numeric:tabular-nums;
     white-space:nowrap;
   }
-  .search-more{
+  .search-load-sentinel{
     display:flex;
+    min-height:48px;
+    align-items:center;
     justify-content:center;
     padding:14px 0 0;
+    color:var(--fg-3);
+    font-size:12.5px;
+    font-weight:650;
+  }
+  .search-load-sentinel span{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
   }
   @media (max-width: 900px) {
     .search-toolbar{
