@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent, syncFolder } from '../api/folders';
-import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
+import { uploadFile, deleteFile, formatBytes, formatDuration, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
 import { createFileShare, getSharedFileUrl } from '../api/shares';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto, FolderSyncResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
@@ -215,6 +215,132 @@ function toAbsoluteUrl(path: string): string {
   return new URL(path, window.location.origin).toString();
 }
 
+function formatDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatNumber(value: number | null | undefined, suffix = ''): string | null {
+  if (value == null) return null;
+  return `${Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 3 })}${suffix}`;
+}
+
+function formatBitrate(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)} Mbps`;
+  if (value >= 1_000) return `${Math.round(value / 1_000).toLocaleString()} Kbps`;
+  return `${value.toLocaleString()} bps`;
+}
+
+function formatCoordinates(lat: number | null, lon: number | null): string | null {
+  if (lat == null || lon == null) return null;
+  return `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+}
+
+function formatFilePath(file: FileResponseDto): string {
+  const path = file.relativePath?.trim();
+  if (path) return path.startsWith('/') ? path : `/${path}`;
+  return `/${file.name}`;
+}
+
+function formatParentPath(path: string | null | undefined): string {
+  const trimmed = path?.trim();
+  if (!trimmed) return '/';
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function formatFolderPath(folder: SimpleFolderResponseDto): string {
+  const path = folder.relativePath?.trim();
+  if (path) return path.startsWith('/') ? path : `/${path}`;
+  return `/${folder.name}`;
+}
+
+function formatFolderParentPath(folder: SimpleFolderResponseDto): string {
+  const path = formatFolderPath(folder);
+  const normalized = path.replace(/\/+$/, '');
+  if (!normalized || normalized === '/') return '/';
+  const lastSlashIndex = normalized.lastIndexOf('/');
+  if (lastSlashIndex <= 0) return '/';
+  return normalized.slice(0, lastSlashIndex);
+}
+
+function getFileInfoGroups(file: FileResponseDto): Array<{ title: string; items: Array<{ label: string; value: string | null }> }> {
+  return [
+    {
+      title: '기본 정보',
+      items: [
+        { label: '파일명', value: file.name },
+        { label: '경로', value: formatFilePath(file) },
+        { label: '상위 폴더', value: formatParentPath(file.parentPath) },
+        { label: '크기', value: formatBytes(file.size) },
+        { label: '종류', value: file.category },
+        { label: 'MIME 타입', value: file.mimeType },
+        { label: '확장자', value: file.extension || null },
+      ],
+    },
+    {
+      title: '날짜',
+      items: [
+        { label: '원본 수정일', value: formatDateTime(file.originUpdatedAt) },
+        { label: '촬영일', value: formatDateTime(file.capturedAt) },
+        { label: '등록일', value: formatDateTime(file.createdAt) },
+        { label: '서버 수정일', value: formatDateTime(file.updatedAt) },
+      ],
+    },
+    {
+      title: '미디어 정보',
+      items: [
+        { label: '해상도', value: file.width != null && file.height != null ? `${file.width} x ${file.height}` : null },
+        { label: '재생 시간', value: file.duration != null ? formatDuration(file.duration) : null },
+        { label: '비디오 코덱', value: file.videoCodec },
+        { label: '오디오 코덱', value: file.audioCodec },
+        { label: '비트레이트', value: formatBitrate(file.bitrate) },
+        { label: 'FPS', value: formatNumber(file.fps) },
+        { label: '포맷', value: file.format },
+        { label: '방향', value: formatNumber(file.orientation, '°') },
+        { label: '좌표', value: formatCoordinates(file.lat, file.lon) },
+      ],
+    },
+    {
+      title: '공유',
+      items: [
+        { label: '공유 상태', value: file.isShared ? '공유 중' : '공유 안 함' },
+        { label: '공유 링크 수', value: `${file.shareKeys?.length ?? 0}개` },
+      ],
+    },
+  ];
+}
+
+function getFolderInfoGroups(folder: SimpleFolderResponseDto): Array<{ title: string; items: Array<{ label: string; value: string | null }> }> {
+  return [
+    {
+      title: '기본 정보',
+      items: [
+        { label: '폴더명', value: folder.name },
+        { label: '경로', value: formatFolderPath(folder) },
+        { label: '상위 폴더', value: formatFolderParentPath(folder) },
+        { label: '루트 폴더', value: folder.isRoot ? '예' : '아니오' },
+      ],
+    },
+    {
+      title: '날짜',
+      items: [
+        { label: '원본 수정일', value: formatDateTime(folder.originUpdatedAt) },
+        { label: '등록일', value: formatDateTime(folder.createdAt) },
+        { label: '서버 수정일', value: formatDateTime(folder.updatedAt) },
+      ],
+    },
+  ];
+}
+
 function countSyncResult(result: FolderSyncResponseDto): number {
   return SYNC_RESULT_GROUPS.reduce((total, group) => total + result[group.key].length, 0);
 }
@@ -283,6 +409,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [sharingFileId, setSharingFileId] = useState<number | null>(null);
   const [createdShare, setCreatedShare] = useState<CreatedShareState | null>(null);
   const [actionMenu, setActionMenu] = useState<ActionMenuState | null>(null);
+  const [infoFile, setInfoFile] = useState<FileResponseDto | null>(null);
+  const [infoFolder, setInfoFolder] = useState<SimpleFolderResponseDto | null>(null);
   const [error, setError] = useState('');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortMenuPos, setSortMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -798,6 +926,18 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
       });
   }
 
+  function handleShowFileInfo(file: FileResponseDto, e: React.MouseEvent) {
+    e.stopPropagation();
+    setActionMenu(null);
+    setInfoFile(file);
+  }
+
+  function handleShowFolderInfo(folderItem: SimpleFolderResponseDto, e: React.MouseEvent) {
+    e.stopPropagation();
+    setActionMenu(null);
+    setInfoFolder(folderItem);
+  }
+
   function handleSortOptionClick(key: FileSortKey) {
     if (key === sortKey) {
       const newDir = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -1112,6 +1252,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           >
             {actionMenuFile ? (
               <>
+                <button onClick={e => handleShowFileInfo(actionMenuFile, e)}>
+                  <Icon name="info" size={15} />
+                  파일 정보보기
+                </button>
                 <button
                   onClick={e => handleCreateShare(actionMenuFile, e)}
                   disabled={sharingFileId !== null}
@@ -1145,6 +1289,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
               </>
             ) : actionMenuFolder ? (
               <>
+                <button onClick={e => handleShowFolderInfo(actionMenuFolder, e)}>
+                  <Icon name="info" size={15} />
+                  폴더 정보보기
+                </button>
                 <button
                   onClick={e => handleDownloadFolder(actionMenuFolder, e)}
                   disabled={downloadingKey !== null}
@@ -1316,6 +1464,86 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             </div>
             <div className="modal-footer">
               <button className="btn primary" onClick={() => setSyncResult(null)}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {infoFile && (
+        <div className="modal-backdrop" onClick={() => setInfoFile(null)}>
+          <div className="modal file-info-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="file-info-title">
+                <span className="file-info-icon">
+                  <FileIcon file={infoFile} size={20} />
+                </span>
+              <div>
+                <h3>파일 정보</h3>
+                <p title={infoFile.name}>{infoFile.name}</p>
+              </div>
+            </div>
+            </div>
+            <div className="modal-body">
+              {getFileInfoGroups(infoFile).map(group => {
+                const items = group.items.filter(item => item.value != null && item.value !== '');
+                if (items.length === 0) return null;
+                return (
+                  <section className="file-info-section" key={group.title}>
+                    <h4>{group.title}</h4>
+                    <div className="file-info-grid">
+                      {items.map(item => (
+                        <div className="file-info-item" key={`${group.title}-${item.label}`}>
+                          <span>{item.label}</span>
+                          <strong title={item.value ?? undefined}>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+            <div className="modal-footer">
+              <button className="btn primary" onClick={() => setInfoFile(null)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {infoFolder && (
+        <div className="modal-backdrop" onClick={() => setInfoFolder(null)}>
+          <div className="modal file-info-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="file-info-title">
+                <span className="file-info-icon">
+                  <Icon name="folder" size={21} color="var(--c-folder)" stroke={1.7} />
+                </span>
+                <div>
+                  <h3>폴더 정보</h3>
+                  <p title={infoFolder.name}>{infoFolder.name}</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-body">
+              {getFolderInfoGroups(infoFolder).map(group => {
+                const items = group.items.filter(item => item.value != null && item.value !== '');
+                if (items.length === 0) return null;
+                return (
+                  <section className="file-info-section" key={group.title}>
+                    <h4>{group.title}</h4>
+                    <div className="file-info-grid">
+                      {items.map(item => (
+                        <div className="file-info-item" key={`${group.title}-${item.label}`}>
+                          <span>{item.label}</span>
+                          <strong title={item.value ?? undefined}>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+            <div className="modal-footer">
+              <button className="btn primary" onClick={() => setInfoFolder(null)}>닫기</button>
             </div>
           </div>
         </div>
@@ -2170,6 +2398,122 @@ const filesStyles = `
     justify-content: flex-end;
     border-top: 1px solid var(--hairline);
     background: var(--bg);
+  }
+
+  .file-info-modal {
+    width: min(720px, calc(100vw - 32px));
+    max-height: min(780px, calc(100vh - 48px));
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .file-info-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .file-info-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .file-info-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--accent-soft);
+  }
+
+  .file-info-title h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fg);
+  }
+
+  .file-info-title p {
+    margin: 4px 0 0;
+    color: var(--fg-3);
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 560px;
+  }
+
+  .file-info-modal .modal-body {
+    padding: 18px 20px;
+    display: grid;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  .file-info-section h4 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--fg-3);
+  }
+
+  .file-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+  }
+
+  .file-info-item {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--surface-1);
+  }
+
+  .file-info-item span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--fg-3);
+    font-size: 11.5px;
+    font-weight: 750;
+  }
+
+  .file-info-item strong {
+    display: block;
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 700;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .file-info-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--hairline);
+  }
+
+  @media (max-width: 640px) {
+    .file-info-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .share-created-modal {
