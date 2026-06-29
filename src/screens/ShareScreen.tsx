@@ -282,9 +282,6 @@ export function ShareScreen({ currentUserId, onOpenVideo, onOpenFile }: ShareScr
           <div className="modal share-confirm-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>공유 링크 삭제</h3>
-              <button className="close-btn" onClick={() => setDeleteTarget(null)}>
-                <Icon name="close" size={16} />
-              </button>
             </div>
             <div className="modal-body">
               <p>이 공유 링크를 삭제하면 더 이상 접근할 수 없습니다.</p>
