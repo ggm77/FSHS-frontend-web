@@ -57,6 +57,16 @@ export interface FileResponseDto {
   shareKeys: string[];
 }
 
+export interface ShareResponseDto {
+  id: number;
+  fileId: number;
+  shareKey: string;
+}
+
+export interface UserSharesResponseDto {
+  shares: ShareResponseDto[];
+}
+
 export interface FileStatusDto {
   status: 'PROCESSING' | 'COMPLETE' | 'ERROR';
   id: number | null;

@@ -343,6 +343,15 @@ export default function App() {
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  function navigateToScreen(nextScreen: Screen, mode: 'push' | 'replace' = 'replace') {
+    setScreen(nextScreen);
+    saveStoredScreen(nextScreen);
+    const url = getScreenPath(nextScreen);
+    if (mode === 'push') window.history.pushState({ screen: nextScreen }, '', url);
+    else window.history.replaceState({ screen: nextScreen }, '', url);
+    setSidebarOpen(false);
+  }
+
   useEffect(() => {
     document.body.setAttribute('data-theme', dark ? 'dark' : 'light');
     localStorage.setItem('theme', dark ? 'dark' : 'light');
@@ -502,15 +511,6 @@ export default function App() {
     navigateToScreen(id as Screen);
   }
 
-  function navigateToScreen(nextScreen: Screen, mode: 'push' | 'replace' = 'replace') {
-    setScreen(nextScreen);
-    saveStoredScreen(nextScreen);
-    const url = getScreenPath(nextScreen);
-    if (mode === 'push') window.history.pushState({ screen: nextScreen }, '', url);
-    else window.history.replaceState({ screen: nextScreen }, '', url);
-    setSidebarOpen(false);
-  }
-
   function handleRootClick() {
     const alreadyAtRootDirectory = screen === 'files'
       && window.location.pathname === '/'
@@ -585,7 +585,7 @@ export default function App() {
           {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-          {screen === 'share'   && <ShareScreen />}
+          {screen === 'share'   && <ShareScreen currentUserId={user?.id ?? null} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
           {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
           {screen === 'admin'        && <AdminScreen />}

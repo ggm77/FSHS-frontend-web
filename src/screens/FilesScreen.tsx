@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import { Icon } from '../components/Icon';
 import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderContent, syncFolder } from '../api/folders';
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
+import { createFileShare, getSharedFileUrl } from '../api/shares';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto, FolderSyncResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
+import { copyTextToClipboard } from '../utils/clipboard';
 
 interface Props {
   rootFolderId: number | null;
@@ -209,6 +211,10 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
 
+function toAbsoluteUrl(path: string): string {
+  return new URL(path, window.location.origin).toString();
+}
+
 function countSyncResult(result: FolderSyncResponseDto): number {
   return SYNC_RESULT_GROUPS.reduce((total, group) => total + result[group.key].length, 0);
 }
@@ -249,6 +255,20 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     totalBytes: number | null;
   }
 
+  interface CreatedShareState {
+    fileId: number;
+    fileName: string;
+    shareKey: string;
+    copied: boolean;
+  }
+
+  interface ActionMenuState {
+    type: 'file' | 'folder';
+    id: number;
+    top: number;
+    right: number;
+  }
+
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [movingItem, setMovingItem] = useState<{ type: 'file' | 'folder'; id: number; name: string } | null>(null);
@@ -260,6 +280,9 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [syncingFolder, setSyncingFolder] = useState(false);
   const [syncResult, setSyncResult] = useState<FolderSyncResponseDto | null>(null);
   const [syncResultFolderName, setSyncResultFolderName] = useState('');
+  const [sharingFileId, setSharingFileId] = useState<number | null>(null);
+  const [createdShare, setCreatedShare] = useState<CreatedShareState | null>(null);
+  const [actionMenu, setActionMenu] = useState<ActionMenuState | null>(null);
   const [error, setError] = useState('');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortMenuPos, setSortMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -401,6 +424,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     setLoading(true);
     setError('');
     setSelected(null);
+    setActionMenu(null);
     try {
       const data = await getFolder(folderId);
       setFolder(data);
@@ -491,6 +515,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   function handleDeleteFolder(folderId: number, e: React.MouseEvent) {
     e.stopPropagation();
+    setActionMenu(null);
     setDialog({
       type: 'confirm',
       title: '폴더 삭제',
@@ -515,6 +540,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   function handleDeleteFile(fileId: number, e: React.MouseEvent) {
     e.stopPropagation();
+    setActionMenu(null);
     setDialog({
       type: 'confirm',
       title: '파일 삭제',
@@ -615,6 +641,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   function handleStartMove(type: 'file' | 'folder', id: number, name: string, e: React.MouseEvent) {
     e.stopPropagation();
+    setActionMenu(null);
     setMovingItem({ type, id, name });
   }
 
@@ -643,13 +670,61 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   function handleDownloadFolder(folder: SimpleFolderResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
+    setActionMenu(null);
     const filename = `${folder.name}.zip`;
     runDownload(`folder-${folder.id}`, filename, onProgress => downloadFolderContent(folder.id, filename, onProgress));
   }
 
   function handleDownloadFile(file: FileResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
+    setActionMenu(null);
     runDownload(`file-${file.id}`, file.name, onProgress => downloadFileContent(file.id, file.name, onProgress));
+  }
+
+  async function handleCreateShare(file: FileResponseDto, e: React.MouseEvent) {
+    e.stopPropagation();
+    setActionMenu(null);
+    if (sharingFileId != null) return;
+
+    setSharingFileId(file.id);
+    setError('');
+
+    try {
+      const share = await createFileShare(file.id);
+      const shareUrl = toAbsoluteUrl(getSharedFileUrl(share.shareKey));
+      let copied = false;
+
+      try {
+        await copyTextToClipboard(shareUrl);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+
+      setCreatedShare({
+        fileId: share.fileId,
+        fileName: file.name,
+        shareKey: share.shareKey,
+        copied,
+      });
+
+      if (currentFolderId != null) await loadFolder(currentFolderId);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '공유 링크를 생성하지 못했습니다.'));
+    } finally {
+      setSharingFileId(null);
+    }
+  }
+
+  async function handleCopyCreatedShare() {
+    if (!createdShare) return;
+
+    try {
+      await copyTextToClipboard(toAbsoluteUrl(getSharedFileUrl(createdShare.shareKey)));
+      setCreatedShare(prev => prev ? { ...prev, copied: true } : prev);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '공유 링크를 복사하지 못했습니다.'));
+    }
   }
 
   function handleOpenFile(file: FileResponseDto) {
@@ -710,6 +785,19 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     }
   }
 
+  function openActionMenu(type: 'file' | 'folder', id: number, e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setActionMenu(prev => prev?.type === type && prev.id === id
+      ? null
+      : {
+        type,
+        id,
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+  }
+
   function handleSortOptionClick(key: FileSortKey) {
     if (key === sortKey) {
       const newDir = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -740,6 +828,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
       ]
     : crumbItems;
   const syncResultTotal = syncResult ? countSyncResult(syncResult) : 0;
+  const actionMenuFile = actionMenu?.type === 'file'
+    ? sortedFiles.find(file => file.id === actionMenu.id)
+    : undefined;
+  const actionMenuFolder = actionMenu?.type === 'folder'
+    ? sortedFolders.find(folderItem => folderItem.id === actionMenu.id)
+    : undefined;
 
   return (
     <>
@@ -885,15 +979,9 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
                       <div className="file-meta">FOLDER</div>
                       <div className="file-meta" style={{ textAlign: 'right' }}>—</div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="row-action" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
-                          <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
-                        </button>
-                        <button className="row-action" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
-                          <Icon name="move" size={14} />
-                        </button>
-                        <button className="row-action" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
-                          <Icon name="trash" size={14} />
+                      <div className="file-actions">
+                        <button className="row-action" title="작업" onClick={e => openActionMenu('folder', f.id, e)}>
+                          <Icon name="moreV" size={16} />
                         </button>
                       </div>
                     </div>
@@ -911,19 +999,19 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         {f.category === 'VIDEO' && f.videoCodec && (
                           <span className="badge-codec">{f.videoCodec}</span>
                         )}
+                        {f.isShared && (
+                          <span className="badge-share" title="공유 중">
+                            <Icon name="link" size={10} stroke={2} />
+                            {f.shareKeys?.length ?? 1}
+                          </span>
+                        )}
                       </div>
                       <div className="file-meta">{formatDate(f.originUpdatedAt)}</div>
                       <div className="file-meta">{f.category}</div>
                       <div className="file-meta" style={{ textAlign: 'right' }}>{formatBytes(f.size)}</div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="row-action" title="다운로드" onClick={e => handleDownloadFile(f, e)} disabled={downloadingKey !== null}>
-                          <Icon name={downloadingKey === `file-${f.id}` ? 'spinner' : 'download'} size={14} />
-                        </button>
-                        <button className="row-action" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
-                          <Icon name="move" size={14} />
-                        </button>
-                        <button className="row-action" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
-                          <Icon name="trash" size={14} />
+                      <div className="file-actions">
+                        <button className="row-action" title="작업" onClick={e => openActionMenu('file', f.id, e)}>
+                          <Icon name="moreV" size={16} />
                         </button>
                       </div>
                     </div>
@@ -941,14 +1029,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                               <span className="nm">{f.name}</span>
                             </div>
                             <div className="grid-card-actions">
-                              <button className="grid-action-btn" title="폴더 다운로드" onClick={e => handleDownloadFolder(f, e)} disabled={downloadingKey !== null}>
-                                <Icon name={downloadingKey === `folder-${f.id}` ? 'spinner' : 'download'} size={14} />
-                              </button>
-                              <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('folder', f.id, f.name, e)}>
-                                <Icon name="move" size={14} />
-                              </button>
-                              <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFolder(f.id, e)}>
-                                <Icon name="trash" size={14} />
+                              <button className="grid-action-btn" title="작업" onClick={e => openActionMenu('folder', f.id, e)}>
+                                <Icon name="moreV" size={16} />
                               </button>
                             </div>
                           </div>
@@ -965,6 +1047,11 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                       <div className="gc-head">
                         <FileIcon file={f} size={18} />
                         <span className="nm">{f.name}</span>
+                        {f.isShared && (
+                          <span className="gc-share-badge" title="공유 중">
+                            <Icon name="link" size={11} stroke={2} />
+                          </span>
+                        )}
                       </div>
                       <div className="gc-prev">
                         <FileThumbnail
@@ -983,14 +1070,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                         )}
                       </div>
                       <div className="grid-card-actions">
-                        <button className="grid-action-btn" title="다운로드" onClick={e => handleDownloadFile(f, e)} disabled={downloadingKey !== null}>
-                          <Icon name={downloadingKey === `file-${f.id}` ? 'spinner' : 'download'} size={14} />
-                        </button>
-                        <button className="grid-action-btn" title="이동" onClick={e => handleStartMove('file', f.id, f.name, e)}>
-                          <Icon name="move" size={14} />
-                        </button>
-                        <button className="grid-action-btn" title="삭제" onClick={e => handleDeleteFile(f.id, e)}>
-                          <Icon name="trash" size={14} />
+                        <button className="grid-action-btn" title="작업" onClick={e => openActionMenu('file', f.id, e)}>
+                          <Icon name="moreV" size={16} />
                         </button>
                       </div>
                     </div>
@@ -1020,6 +1101,74 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           </div>
         ) : null}
       </div>
+
+      {actionMenu && (actionMenuFile || actionMenuFolder) && (
+        <>
+          <div className="action-menu-backdrop" onClick={() => setActionMenu(null)} />
+          <div
+            className="item-action-menu"
+            style={{ top: actionMenu.top, right: actionMenu.right }}
+            onClick={e => e.stopPropagation()}
+          >
+            {actionMenuFile ? (
+              <>
+                <button
+                  onClick={e => handleCreateShare(actionMenuFile, e)}
+                  disabled={sharingFileId !== null}
+                >
+                  <Icon
+                    name={sharingFileId === actionMenuFile.id ? 'spinner' : 'share'}
+                    size={15}
+                    className={sharingFileId === actionMenuFile.id ? 'spin-icon' : undefined}
+                  />
+                  {actionMenuFile.isShared ? '공유 링크 추가 생성' : '공유 링크 생성'}
+                </button>
+                <button
+                  onClick={e => handleDownloadFile(actionMenuFile, e)}
+                  disabled={downloadingKey !== null}
+                >
+                  <Icon
+                    name={downloadingKey === `file-${actionMenuFile.id}` ? 'spinner' : 'download'}
+                    size={15}
+                    className={downloadingKey === `file-${actionMenuFile.id}` ? 'spin-icon' : undefined}
+                  />
+                  다운로드
+                </button>
+                <button onClick={e => handleStartMove('file', actionMenuFile.id, actionMenuFile.name, e)}>
+                  <Icon name="move" size={15} />
+                  이동
+                </button>
+                <button className="danger" onClick={e => handleDeleteFile(actionMenuFile.id, e)}>
+                  <Icon name="trash" size={15} />
+                  삭제
+                </button>
+              </>
+            ) : actionMenuFolder ? (
+              <>
+                <button
+                  onClick={e => handleDownloadFolder(actionMenuFolder, e)}
+                  disabled={downloadingKey !== null}
+                >
+                  <Icon
+                    name={downloadingKey === `folder-${actionMenuFolder.id}` ? 'spinner' : 'download'}
+                    size={15}
+                    className={downloadingKey === `folder-${actionMenuFolder.id}` ? 'spin-icon' : undefined}
+                  />
+                  폴더 다운로드
+                </button>
+                <button onClick={e => handleStartMove('folder', actionMenuFolder.id, actionMenuFolder.name, e)}>
+                  <Icon name="move" size={15} />
+                  이동
+                </button>
+                <button className="danger" onClick={e => handleDeleteFolder(actionMenuFolder.id, e)}>
+                  <Icon name="trash" size={15} />
+                  삭제
+                </button>
+              </>
+            ) : null}
+          </div>
+        </>
+      )}
 
       {showUploadStatus && (
         <div className="upload-status-widget">
@@ -1167,6 +1316,42 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
             </div>
             <div className="modal-footer">
               <button className="btn primary" onClick={() => setSyncResult(null)}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createdShare && (
+        <div className="modal-backdrop" onClick={() => setCreatedShare(null)}>
+          <div className="modal share-created-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>공유 링크 생성 완료</h3>
+                <p>{createdShare.fileName}</p>
+              </div>
+              <button className="close-btn" onClick={() => setCreatedShare(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="share-created-field">
+                <span>공유 링크</span>
+                <input
+                  readOnly
+                  value={toAbsoluteUrl(getSharedFileUrl(createdShare.shareKey))}
+                  onFocus={e => e.currentTarget.select()}
+                />
+              </label>
+              <div className={createdShare.copied ? 'share-copy-note good' : 'share-copy-note'}>
+                {createdShare.copied ? '링크를 클립보드에 복사했습니다.' : '링크 복사가 필요하면 아래 버튼을 눌러주세요.'}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setCreatedShare(null)}>닫기</button>
+              <button className="btn primary" onClick={handleCopyCreatedShare}>
+                <Icon name={createdShare.copied ? 'check' : 'copy'} size={14} color="var(--accent-fg)" />
+                {createdShare.copied ? '복사됨' : '링크 복사'}
+              </button>
             </div>
           </div>
         </div>
@@ -1370,7 +1555,7 @@ const filesStyles = `
   }
   .file-row{
     display:grid;
-    grid-template-columns:minmax(0, 2.8fr) 1.05fr 0.85fr 0.85fr 96px;
+    grid-template-columns:minmax(0, 2.8fr) 1.05fr 0.85fr 0.85fr 44px;
     align-items:center; gap:14px;
     padding:0 14px; height:46px;
     border-top:1px solid var(--hairline);
@@ -1392,9 +1577,69 @@ const filesStyles = `
     background:var(--accent-soft);
   }
   .file-meta{ font-size:12.5px; color:var(--fg-3); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-actions{ display:flex; justify-content:flex-end; gap:4px; }
   .row-action{ width:28px; height:28px; border-radius:8px; display:grid; place-items:center; color:var(--fg-3); background:transparent; border:0; }
   .row-action:hover{ background:var(--surface-2); color:var(--accent); }
   .row-action:disabled{ opacity:.5; cursor:not-allowed; }
+  .badge-share{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    height:18px;
+    padding:0 6px;
+    border-radius:5px;
+    background:rgba(19, 185, 122, .12);
+    color:var(--good);
+    font-size:10.5px;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .action-menu-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:180;
+    background:transparent;
+  }
+  .item-action-menu{
+    position:fixed;
+    z-index:210;
+    min-width:168px;
+    padding:6px;
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    background:var(--bg);
+    box-shadow:var(--shadow-md);
+    display:grid;
+    gap:2px;
+  }
+  .item-action-menu button{
+    width:100%;
+    height:34px;
+    padding:0 10px;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    color:var(--fg-2);
+    font:inherit;
+    font-size:13px;
+    font-weight:650;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    text-align:left;
+  }
+  .item-action-menu button:hover:not(:disabled){
+    background:var(--surface-1);
+    color:var(--accent);
+  }
+  .item-action-menu button.danger{
+    color:var(--bad);
+  }
+  .item-action-menu button:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+  }
 
   .file-grid-sections{ display:flex; flex-direction:column; gap:24px; }
 .file-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:12px; }
@@ -1402,6 +1647,17 @@ const filesStyles = `
   .grid-card:hover{ box-shadow:var(--shadow-md); transform:translateY(-1px); }
   .grid-card .gc-head{ display:flex; align-items:center; gap:9px; padding:12px 12px 10px; font-size:13px; font-weight:700; }
   .grid-card .gc-head .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .grid-card .gc-share-badge{
+    margin-left:auto;
+    width:24px;
+    height:24px;
+    border-radius:8px;
+    display:grid;
+    place-items:center;
+    flex-shrink:0;
+    color:var(--good);
+    background:rgba(19, 185, 122, .12);
+  }
   .grid-card .gc-prev{ height:124px; margin:0 12px 12px; border-radius:8px; background:var(--surface-1); display:grid; place-items:center; overflow:hidden; position:relative; }
   .grid-card.gc-folder .gc-head{ padding:10px 12px; }
   .grid-card.gc-folder{ cursor:pointer; }
@@ -1914,6 +2170,93 @@ const filesStyles = `
     justify-content: flex-end;
     border-top: 1px solid var(--hairline);
     background: var(--bg);
+  }
+
+  .share-created-modal {
+    width: min(520px, calc(100vw - 32px));
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .share-created-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .share-created-modal h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fg);
+  }
+
+  .share-created-modal .modal-header p {
+    margin: 4px 0 0;
+    color: var(--fg-3);
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 360px;
+  }
+
+  .share-created-modal .modal-body {
+    padding: 18px 20px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .share-created-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .share-created-field span {
+    color: var(--fg-3);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .share-created-field code,
+  .share-created-field input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-1);
+    color: var(--fg);
+    padding: 9px 10px;
+    font: inherit;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .share-copy-note {
+    color: var(--fg-3);
+    font-size: 12.5px;
+  }
+
+  .share-copy-note.good {
+    color: var(--good);
+    font-weight: 700;
+  }
+
+  .share-created-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--hairline);
   }
 
   .grid-card {
