@@ -104,6 +104,14 @@ body {
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 html[data-media-route="video"],
 body[data-media-route="video"],
 html[data-media-route="video"] #root {
