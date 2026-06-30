@@ -645,7 +645,7 @@ export default function App() {
             onMenuClick={() => setSidebarOpen(true)}
           />
           {screen === 'files'   && <FilesScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-          {screen === 'gallery' && <GalleryScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} />}
+          {screen === 'gallery' && <GalleryScreen onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} initialQuery={topSearchQuery} />}
           {screen === 'share'   && <ShareScreen currentUserId={user?.id ?? null} onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}

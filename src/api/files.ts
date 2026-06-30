@@ -19,6 +19,12 @@ export interface FileSearchResponse {
   items: FileResponseDto[];
 }
 
+export interface GallerySearchParams {
+  order?: FileSearchOrder;
+  size?: number;
+  page?: number;
+}
+
 export function getFile(fileId: number): Promise<FileResponseDto> {
   return request(`/files/${fileId}`);
 }
@@ -32,6 +38,15 @@ export function searchFiles(params: FileSearchParams): Promise<FileSearchRespons
   if (params.size != null) query.set('size', String(params.size));
   if (params.page != null) query.set('page', String(params.page));
   return request(`/files?${query.toString()}`);
+}
+
+export function getGalleryFiles(params: GallerySearchParams = {}): Promise<FileSearchResponse> {
+  const query = new URLSearchParams();
+  if (params.order) query.set('order', params.order);
+  if (params.size != null) query.set('size', String(params.size));
+  if (params.page != null) query.set('page', String(params.page));
+  const qs = query.toString();
+  return request(`/files/gallery${qs ? `?${qs}` : ''}`);
 }
 
 export function getFileStatus(fileUuid: string): Promise<FileStatusDto> {

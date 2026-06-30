@@ -1,0 +1,1126 @@
+<html><head><title>v2 API 명세서</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+
+	table.collection-content {
+		width: 100%;
+		table-layout: fixed;
+	}
+
+	table.collection-content th,
+	table.collection-content td {
+		overflow-wrap: anywhere;
+	}
+
+	table.collection-content td > .user,
+	table.collection-content td > time {
+		white-space: pre-wrap;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content-wrapper {
+	overflow-x: auto;
+}
+
+@media only print {
+	.collection-content-wrapper {
+		overflow-x: visible;
+	}
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	gap: 46px;
+}
+
+.column {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.column > *:first-child {
+	margin-top: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+table {
+	border-collapse: collapse;
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol.numbered-list.numbered-list-digits-2 {
+	padding-inline-start: 2em;
+}
+
+ol.numbered-list.numbered-list-digits-3plus {
+	padding-inline-start: 2.4em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body class="pdf ko-KR" lang="ko-KR"><article id="2ef214c9-48c3-80cf-9853-ebef1ed947c9" class="page sans"><header><h1 class="page-title" dir="auto">v2 API 명세서</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><hr id="2ef214c9-48c3-80f8-bf25-d8de03529b6d"/></div><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8041-8d7d-ec9156f4e5c5" class=""><code>/api/v2/auth</code> 하위 API들만 인증 없이 접근 가능</blockquote></div><div style="display:contents" dir="auto"><h2 id="2ef214c9-48c3-80d9-a572-ef7abcb933df" class="">유저 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-8086-ba10-c07e051363d2"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-809c-9878-e97b6ae639a7" class="toggle"><li><details open=""><summary>[POST] /api/v2/users - 유저 추가 * </summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-808a-9d23-f02eddd9671d" class="block-color-teal_background">유저를 추가하는 API<br/>기본 유저(admin)은 기본적으로 존재함</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8042-87b9-c13ce1111526" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80b4-8e37-c46332dd8ef8" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js" integrity="sha512-QXFMVAusM85vUYDaNgcYeU3rzSlc+bTV4JvkfJhjxSHlQEo+ig53BtnGkvFTiNJh8D+wv6uWAQ2vJaVmxe8d3w==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><pre id="2f0214c9-48c3-80b6-8096-c6c1d196609b" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;password&quot; : String
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8048-bb66-deb8bba14d29" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-807f-b856-c6463bb98b3b" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-800b-b915-ea03e708d176" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8080-93eb-c3d96a38148d" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;role&quot; : String, //유저 Role
+    &quot;rootFolderId&quot; : Long, //루트 폴더 ID
+    &quot;createdAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;,
+    &quot;updatedAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8042-99d3-e151253f5408" class="toggle"><li><details open=""><summary>[GET] /api/v2/users/{userId} - 유저 정보 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8034-a66c-dbd23555a9dd" class="block-color-teal_background">유저의 정보를 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-805b-9442-fc2e2f89c4af" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c8-8839-eb6a09d58037" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-803b-a351-e1109acf8244" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+userId: 수정할 유저의 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f8-9dd8-dae58a53196a" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8073-ba4c-d3b8d52d61d1" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8078-800e-db6cba275032" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8016-a317-ee5e72d7fb75" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;role&quot; : String, //유저 Role
+    &quot;rootFolderId&quot; : Long, //루트 폴더 ID
+    &quot;createdAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;,
+    &quot;updatedAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80c9-b01a-eb00f2837b68" class="toggle"><li><details open=""><summary>[PATCH] /api/v2/users/{userId} - 유저 정보 수정 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80f1-a88e-c1104c57fe63" class="block-color-teal_background">유저의 정보를 수정하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80bd-9a55-db79c7edfd03" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8086-86f5-eeed6271b06b" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80eb-8f37-cdcbb761ab31" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+userId: 수정할 유저의 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-809c-98bd-f406515c51a3" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80d8-ab10-eb09b80a2ff6" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80b8-b418-de7d84469976" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;password&quot; : String
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c2-8b2c-cefb82b2a79f" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-804f-8409-f633a470a3b0" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8002-9a0e-df71dae71e2a" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8035-ad6e-dc66582cb317" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;role&quot; : String, //유저 Role
+    &quot;rootFolderId&quot; : Long, //루트 폴더 ID
+    &quot;createdAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;,
+    &quot;updatedAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot;
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8073-adcd-e359cd8f56fd" class="">
+</p></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80a1-8422-e7911db6c483" class="toggle"><li><details open=""><summary>[DELETE] /api/v2/users/{userId} - 유저 삭제 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8035-9e47-f8599ecdf530" class="block-color-teal_background">유저 삭제하는 API<br/>기본 유저(admin)은 삭제 불가</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8054-aa40-cd1f69d6b24c" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8033-95f8-e8a84e1c5fd0" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8053-8658-c32b7492249e" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+userId: 삭제할 유저의 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f6-8f61-de6b6e5d1b07" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-801d-8aa4-eb5a0fab279a" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8038-a979-fc24e374723a" class=""><code>Status: 204</code></p></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8078-9cca-e8fd28e032d6" class="">
+</p></div><div style="display:contents" dir="auto"><ul id="377214c9-48c3-806c-9857-ff61136bf530" class="toggle"><li><details open=""><summary>[POST] /api/v2/users/{userId}/root-folder - 유저에게 특정 폴더를 루트 폴더로 쓸 수 있게 하기 *</summary><div style="display:contents" dir="auto"><blockquote id="377214c9-48c3-80f2-bf4e-e02ddd50a426" class="block-color-teal_background">유저에게 특정 폴더를 루트 폴더로 사용하게 하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-80f5-901e-cd4737436c05" class="">
+</p></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8002-9194-db73bfe01639" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="377214c9-48c3-80bf-967b-e859e6f6e570" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+userId: 수정할 유저의 ID</code></pre></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8057-9151-df9316340ee6" class="">
+</p></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8030-9ee0-c5f16a4ea09d" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="377214c9-48c3-8092-ad38-fecf213acda1" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;folderId&quot;: 125
+}</code></pre></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8005-9074-fbcb80eef35b" class="">
+</p></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8086-ba49-ffd1b814a6bc" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="377214c9-48c3-8093-aa4f-da88a918e6f3" class=""><code>Status: 204</code></p></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f3-83d6-fbbf01e8b48d" class="">
+</p></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80dd-9b59-f968b68701d1" class="toggle"><li><details open=""><summary>[GET] /api/v2/users/{userId}/shares - 유저가 공유한 파일 목록 보기 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8041-9623-de2fdd8cbdc5" class="block-color-teal_background">유저가 생성한 공유 링크 정보 보기</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80e2-900a-d8f63b71b39b" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-809a-bc1b-eb3928799a2a" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8007-85f3-e3648db40ba5" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+userId: 조회할 유저의 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8055-88e7-c06c567e064a" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8075-a641-fa622fc34f67" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8053-8c40-cf43800796ce" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-807b-961b-ea30908a98fa" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;shares&quot; : [
+        {
+            &quot;id&quot; : Long,
+            &quot;fileId&quot; : Long,
+            &quot;shareKey&quot; : String // 실제로는 &#x27;/api/v2/auth/files/{shareKey}/**&#x27;로 접근
+        }
+    ]
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-801d-bb59-dc01ba65c9b1" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="2f0214c9-48c3-801f-af3c-dc23f642132e" class="">인증 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-80a7-bac1-efd82fcb77b2"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8086-b3a5-db1e826e4b9a" class="toggle"><li><details open=""><summary>[POST] /api/v2/auth/login - 로그인 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-807f-822d-e55b35529757" class="block-color-teal_background">로그인 하는 API<br/>세션 방식 로그인<br/><code>application/x-www-form-urlencoded</code> 로 요청 보내야 함.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8089-8fa0-e84fa2cab641" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ff-a766-f128d3f169e6" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8035-9d27-ea0a0296a863" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;username&quot; : String,
+    &quot;password&quot; : String
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80b6-9344-ff776cbf4544" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806c-878f-cc79d261f4c2" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8075-9213-cdaf7f647665" class=""><code>Status: 204</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-808d-a709-cd373f7618f0" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">바디 없음</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f9214c9-48c3-80c8-b65d-d41351419e0c" class="toggle"><li><details open=""><summary>[POST] /api/v2/auth/logout - 로그아웃 *</summary><div style="display:contents" dir="auto"><blockquote id="2f9214c9-48c3-80a9-97e3-e8422ca1876c" class="block-color-teal_background">로그아웃 하는 API<br/>세션 방식<br/><code>application/x-www-form-urlencoded</code> 로 요청 보내야 함.</blockquote></div><div style="display:contents" dir="auto"><p id="2f9214c9-48c3-8091-96c4-f1e4c3c22bcb" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f9214c9-48c3-80cb-b860-c3487bcf0544" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f9214c9-48c3-80c2-b4a8-ff149983daa9" class=""><code>Status: 204</code></p></div><div style="display:contents" dir="auto"><pre id="2f9214c9-48c3-80e5-a88f-d147963f3a8b" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">바디 없음</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8004-b7f0-d067cca4d34b" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="2f0214c9-48c3-80a4-b594-f9d81c435899" class="">파일 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-8069-adc0-d68237c99484"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80ba-bd3f-cba8e426c25d" class="toggle"><li><details open=""><summary>[POST] /api/v2/files - 파일 단건 업로드 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-801b-804c-fe2b9ecbb20f" class="block-color-teal_background">파일 업로드하는 API<br/>파일 업로드는 multipart/form-data로 진행<br/>파일은 application/octet-stream<br/>데이터는 application/json</blockquote></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-80c6-8cd7-f1d27a2460c1" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80a6-b04f-d45a0256cd5e" class=""><strong>Request Param</strong></p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js" integrity="sha512-8VrjxGFLIkS0mgEmO3p46A5OkqATHhrNVwyv2V7yUeZrk1jmSDuI3SOEpC9XHEHUWEOsfzzcJeBlUkee9lKGrw==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js" integrity="sha512-namzGTZvHaug0jeipHRN2pMepMiJj+EbrloktVFlMYGnA0EwZhbdLeENjBYLCgoghVbZGinIz/FFYHmB0o3wLw==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><pre id="36c214c9-48c3-809a-96b9-c1a0e6d0b08c" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">lastModified: &quot;2026-01-22T10:43:39.008Z&quot;
+folderId: Long</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8035-ba0a-eea5e3866a5f" class=""><strong>Request Part</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-802d-8bdf-c799e316cff0" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">files: 파일</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806b-90b3-d9c95f935e44" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ab-80fe-d07d7bf87b7c" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-808c-9317-fe4ed5e383c0" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="36c214c9-48c3-8016-8785-d45758684b4d" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">{
+		&quot;fileUuid&quot; : String // 파일 상태 조회를 위한 임시 UUID
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80c7-97f6-c18fe2bf9fc6" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileUuid}/status - 파일 업로드 상태 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-801f-820f-ce87dbb530d3" class="block-color-teal_background">파일 처리 상태를 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80cd-8737-c1256142cf36" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80e7-bc25-c08ede3cd271" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8044-aba2-e1364de4f78e" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileUuid: 업로드 상태 조회할 파일 UUID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8059-8021-d2a98a7b2df8" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-804e-bb05-d0a21facaaeb" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8039-a5fc-dd92c34ffdd3" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-801d-a406-d955a5b8d969" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;status&quot; : &quot;COMPLETE&quot;, // COMPLETE, PROCESSING, ERROR가 존재
+    &quot;id&quot; : Long // 파일의 아이디
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="36c214c9-48c3-8044-823b-ee3e1709d44b" class="toggle"><li><details open=""><summary>[GET] /api/v2/files - 파일 검색 *</summary><div style="display:contents" dir="auto"><blockquote id="36c214c9-48c3-80e7-8ed8-d682e41793a4" class="block-color-teal_background">파일 정보를 조회하는 API<br/>쿼리 파라미터를 이용해서 검색 조건을 설정함.</blockquote></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-806b-a34d-e3c58183a285" class="">
+</p></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-807b-8cf6-ce4644d1de37" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="36c214c9-48c3-809d-af16-fc69038ea4e7" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Query]
+query: 검색어
+category: 카테고리 //IMAGE, VIDEO 등 (null 주면 전체 조회)
+sort: 정렬 방식 //name, size, originUpdatedAt, updatedAt
+order: 정렬 방향 //asc, desc
+size: 한 페이지에 보여줄 정보의 양 // 최대 1000
+page: 조회할 페이지 // 0번부터 시작</code></pre></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-8064-b9b7-dadfc3644e0c" class="">
+</p></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-80b4-adaa-dcc20d9e2f73" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-80d5-9af6-f061d2879ba7" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="36c214c9-48c3-8054-a085-c6875ec324e8" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;hasNext&quot; : Boolean, //다음 페이지 존재 여부
+    &quot;items&quot; : [ //검색 된 내용
+        {
+				  &quot;id&quot;: 0,
+				  &quot;ownerId&quot;: 0, // 파일 올린 사람 ID
+				  &quot;name&quot;: &quot;string&quot;, // 파일명(확장자 포함)
+				  &quot;baseName&quot;: &quot;string&quot;, // 파일명
+				  &quot;extension&quot;: &quot;string&quot;, // 확장자
+				  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로
+				  &quot;parentPath&quot;: &quot;string&quot;, // 파일이 들어있는 폴더 경로
+				  &quot;mimeType&quot;: &quot;string&quot;, // MIME 타입
+				  &quot;size&quot;: 0, // 파일 크기(바이트)
+				  &quot;videoCodec&quot;: &quot;string&quot;, // 비디오 코덱
+				  &quot;audioCodec&quot;: &quot;string&quot;, // 오디오 코덱
+				  &quot;width&quot;: 0, // 이미지 너비
+				  &quot;height&quot;: 0, // 이미지 높이
+				  &quot;duration&quot;: 0, // 재생 시간
+				  &quot;bitrate&quot;: 0, // 비트레이트
+				  &quot;orientation&quot;: 0, // 이미지 회전 정보
+				  &quot;lat&quot;: 0.1, // 위도
+				  &quot;lon&quot;: 0.1, // 경도
+				  &quot;fps&quot;: 0.1, // 프레임
+				  &quot;format&quot;: &quot;string&quot;, // 영상 포멧 정보
+				  &quot;capturedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 사진 찍힌 날짜
+				  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 파일 마지막 수정시각
+				  &quot;createdAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최초 등록 시점
+				  &quot;updatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최종 수정 시점
+				  &quot;category&quot;: &quot;string&quot;, // 파일의 카테고리
+				  &quot;isShared&quot;: true, // 공유 된 파일인지 여부
+				  &quot;shareKeys&quot;: [ // 공유 키 리스트
+				    &quot;string&quot;
+				  ]
+				}
+    ]
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-800b-9298-de75238612a6" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileId} - 파일 정보 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-804a-b155-c55b17edd389" class="block-color-teal_background">파일 정보 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80eb-adbb-d03fbd67a25c" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-805b-9540-ddd9c6fb308f" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80d9-a643-d043f057ede6" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 조회할 파일 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ae-a139-d700edbc24a2" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80b2-9484-ff4e79743ef5" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8083-8fcd-da4cff619526" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f3214c9-48c3-80fc-a1b8-ed99f85527c0" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;id&quot;: 0,
+  &quot;uuid&quot;: String, // 파일 UUID
+  &quot;ownerId&quot;: 0, // 파일 올린 사람 ID
+  &quot;name&quot;: &quot;string&quot;, // 파일명(확장자 포함)
+  &quot;baseName&quot;: &quot;string&quot;, // 파일명
+  &quot;extension&quot;: &quot;string&quot;, // 확장자
+  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로
+  &quot;parentPath&quot;: &quot;string&quot;, // 파일이 들어있는 폴더 경로
+  &quot;mimeType&quot;: &quot;string&quot;, // MIME 타입
+  &quot;size&quot;: 0, // 파일 크기(바이트)
+  &quot;videoCodec&quot;: &quot;string&quot;, // 비디오 코덱
+  &quot;audioCodec&quot;: &quot;string&quot;, // 오디오 코덱
+  &quot;width&quot;: 0, // 이미지 너비
+  &quot;height&quot;: 0, // 이미지 높이
+  &quot;duration&quot;: 0, // 재생 시간
+  &quot;bitrate&quot;: 0, // 비트레이트
+  &quot;orientation&quot;: 0, // 이미지 회전 정보
+  &quot;lat&quot;: 0.1, // 위도
+  &quot;lon&quot;: 0.1, // 경도
+  &quot;fps&quot;: 0.1, // 프레임
+  &quot;format&quot;: &quot;string&quot;, // 영상 포멧 정보
+  &quot;capturedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 사진 찍힌 날짜
+  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 파일 마지막 수정시각
+  &quot;createdAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최초 등록 시점
+  &quot;updatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최종 수정 시점
+  &quot;category&quot;: &quot;string&quot;, // 파일의 카테고리
+  &quot;isShared&quot;: true, // 공유 된 파일인지 여부
+  &quot;shareKeys&quot;: [ // 공유 키 리스트
+    &quot;string&quot;
+  ]
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8038-922c-cb608fa59087" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileUuid}/thumbnail - 파일 썸네일 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-801f-9037-ea2ccbf10ace" class="block-color-teal_background">파일 썸네일 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ae-9cba-f4d49a94f168" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8049-845c-fd188a167714" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8061-b446-d1b5a52a45f5" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileUuid: 조회할 파일 UUID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8031-97fd-ccf33ab565cd" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806d-bed6-d1caef22e1ed" class=""><strong>Response Header</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80b6-ae89-f47db5a2f948" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">Content-Type: image/jpeg</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-802e-ac9e-ed650f163ea9" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8012-9994-dec4bf2db7bc" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80dd-928b-d44de9b6f2fd" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8079-9332-ce219a4c7b82" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">이미지 데이터</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-807a-beb0-eb93872b2321" class="toggle"><li><details open=""><summary>[PATCH] /api/v2/files/{fileId} - 파일 정보 수정 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80a8-a5d1-c4125488e3cc" class="block-color-teal_background">파일 정보 수정하는 API<br/>여기서 파일 위치를 옮길 수 있음</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80aa-8586-ed3f6f978bee" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8061-be86-eba1b16d63d7" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8063-9ffd-f916179d5dfb" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 수정할 파일 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8051-8646-ead3ea17a47b" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80e3-a651-c7a2cbd17135" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80f6-af7b-c68d85f5b452" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;folderId&quot; : Long, //위치 옮길 대상 폴더 ID
+    &quot;originUpdatedAt&quot; : &quot;2026-01-22T10:43:39.008Z&quot; //파일 수정일
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-804a-bd7c-e3ba0187ee23" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8094-988a-eb0fb0a9fc4a" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-807d-a0e0-f2cc369d994f" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f3214c9-48c3-806f-9bff-d3c900399617" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;id&quot;: 0,
+  &quot;uuid&quot;: String, // 파일 UUID
+  &quot;ownerId&quot;: 0, // 파일 올린 사람 ID
+  &quot;name&quot;: &quot;string&quot;, // 파일명(확장자 포함)
+  &quot;baseName&quot;: &quot;string&quot;, // 파일명
+  &quot;extension&quot;: &quot;string&quot;, // 확장자
+  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로
+  &quot;parentPath&quot;: &quot;string&quot;, // 파일이 들어있는 폴더 경로
+  &quot;mimeType&quot;: &quot;string&quot;, // MIME 타입
+  &quot;size&quot;: 0, // 파일 크기(바이트)
+  &quot;videoCodec&quot;: &quot;string&quot;, // 비디오 코덱
+  &quot;audioCodec&quot;: &quot;string&quot;, // 오디오 코덱
+  &quot;width&quot;: 0, // 이미지 너비
+  &quot;height&quot;: 0, // 이미지 높이
+  &quot;duration&quot;: 0, // 재생 시간
+  &quot;bitrate&quot;: 0, // 비트레이트
+  &quot;orientation&quot;: 0, // 이미지 회전 정보
+  &quot;lat&quot;: 0.1, // 위도
+  &quot;lon&quot;: 0.1, // 경도
+  &quot;fps&quot;: 0.1, // 프레임
+  &quot;format&quot;: &quot;string&quot;, // 영상 포멧 정보
+  &quot;capturedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 사진 찍힌 날짜
+  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 파일 마지막 수정시각
+  &quot;createdAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최초 등록 시점
+  &quot;updatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최종 수정 시점
+  &quot;category&quot;: &quot;string&quot;, // 파일의 카테고리
+  &quot;isShared&quot;: true, // 공유 된 파일인지 여부
+  &quot;shareKeys&quot;: [ // 공유 키 리스트
+    &quot;string&quot;
+  ]
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80c2-82a0-e12adcda8edd" class="toggle"><li><details open=""><summary>[DELETE] /api/v2/files/{fileId} - 파일 휴지통으로 이동 !</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80a6-8e0a-d2e1121dafd0" class="block-color-teal_background">파일 삭제하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-807d-bcf1-fb81635ec87b" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ce-86e7-f25d8f058959" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80b7-95a8-fa98875157e7" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 삭제할 파일 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8003-b19c-f8fb5d9e8a9e" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80a0-9ab2-f931a36d16b9" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80e9-968a-e73c7b2ed72a" class=""><code>Status: 204</code></p></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80de-909c-c349a97c57de" class="toggle"><li><details open=""><summary>[POST] /api/v2/files/{fileId}/shares - 파일 공유 링크 생성 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8068-b81d-cb314747c29c" class="block-color-teal_background">파일 공유 링크 생성하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80eb-af03-d98003286ab0" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8001-b8c8-c2c98bd106c1" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80dd-9ea1-ead731c3935d" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 공유링크 생성할 파일 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-804c-844b-d35aad176ddb" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8009-810e-d6408c436a09" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8068-b166-d64e0d777c42" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80c3-be40-dfbd873bc9ba" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;id&quot; : Long,
+    &quot;fileId&quot; : Long,
+    &quot;shareKey&quot; : String // 실제로는 &#x27;/api/v2/auth/files/{shareKey}/**&#x27;로 접근
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-8030-a7f8-c4eeaa2ce578" class="">
+</p></div><div style="display:contents" dir="auto"><h3 id="38f214c9-48c3-80d8-a448-c544d27efc8d" class="">갤러리</h3></div><div style="display:contents" dir="auto"><ul id="38f214c9-48c3-800e-83ab-d64ad16ef321" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/gallery - 갤러리 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="38f214c9-48c3-801b-903e-f20bd3fd6405" class="block-color-teal_background">갤러리 목록을 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-80a2-a739-da1129c5639c" class="">
+</p></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-80bf-b8fd-fa1010f2c2c6" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="38f214c9-48c3-804f-99ba-ce468c47b9f8" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Query]
+order: 정렬 방향 //asc, desc
+size: 한 페이지에 보여줄 정보의 양 // 최대 1000
+page: 조회할 페이지 // 0번부터 시작</code></pre></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-8005-945f-fe949f64206a" class="">
+</p></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-8090-8bfa-d61a7c0ac5cf" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-803e-8fe4-f5a6a86dd6e5" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="38f214c9-48c3-8027-b3c7-e0465c1f69ed" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;hasNext&quot; : Boolean, //다음 페이지 존재 여부
+    &quot;items&quot; : [ //검색 된 내용
+        {
+				  &quot;id&quot;: 0,
+				  &quot;ownerId&quot;: 0, // 파일 올린 사람 ID
+				  &quot;name&quot;: &quot;string&quot;, // 파일명(확장자 포함)
+				  &quot;baseName&quot;: &quot;string&quot;, // 파일명
+				  &quot;extension&quot;: &quot;string&quot;, // 확장자
+				  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로
+				  &quot;parentPath&quot;: &quot;string&quot;, // 파일이 들어있는 폴더 경로
+				  &quot;mimeType&quot;: &quot;string&quot;, // MIME 타입
+				  &quot;size&quot;: 0, // 파일 크기(바이트)
+				  &quot;videoCodec&quot;: &quot;string&quot;, // 비디오 코덱
+				  &quot;audioCodec&quot;: &quot;string&quot;, // 오디오 코덱
+				  &quot;width&quot;: 0, // 이미지 너비
+				  &quot;height&quot;: 0, // 이미지 높이
+				  &quot;duration&quot;: 0, // 재생 시간
+				  &quot;bitrate&quot;: 0, // 비트레이트
+				  &quot;orientation&quot;: 0, // 이미지 회전 정보
+				  &quot;lat&quot;: 0.1, // 위도
+				  &quot;lon&quot;: 0.1, // 경도
+				  &quot;fps&quot;: 0.1, // 프레임
+				  &quot;format&quot;: &quot;string&quot;, // 영상 포멧 정보
+				  &quot;capturedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 사진 찍힌 날짜
+				  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 파일 마지막 수정시각
+				  &quot;createdAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최초 등록 시점
+				  &quot;updatedAt&quot;: &quot;2026-05-26T07:30:16.640Z&quot;, // 서버에 최종 수정 시점
+				  &quot;category&quot;: &quot;string&quot;, // 파일의 카테고리
+				  &quot;isShared&quot;: true, // 공유 된 파일인지 여부
+				  &quot;shareKeys&quot;: [ // 공유 키 리스트
+				    &quot;string&quot;
+				  ]
+				}
+    ]
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-80de-8073-e245c467e9b5" class="">
+</p></div><div style="display:contents" dir="auto"><h3 id="2f1214c9-48c3-8082-b485-e87ddca467e8" class="">스트리밍 및 다운로드</h3></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8027-93e1-d857b9ce01aa" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileId}/content - 파일 다운로드 &amp; 직접 스트리밍 * </summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8070-b168-ff17580b9f29" class="block-color-teal_background">파일을 다운로드 하거나 직접 스트리밍 하는 API<br/>브라우저가 해당 코덱을 지원할 때 이 API로 직접 스트리밍 함.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8098-9efa-de5d9cc84400" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ee-aaed-d5c5d24023ad" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80f8-bdbc-f1c8dd813041" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 조회할 파일 ID
+
+[Query]
+download: 이 요청이 다운로드인지 여부 (비어있거나 False이면 직접 스트리밍)</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-805d-9e07-cd35d9d62957" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8004-9afa-dfb9b0bb31a6" class=""><strong>Response Header</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8072-9b66-d1e97f776415" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">Content-Type: 파일에 맞는 타입
+Content-Disposition: attachment; filename=&quot;확장자를 포함한 파일명&quot;
+Content-Length: 파일 크기</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-800a-8b62-c5ebcfeae9b3" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-808d-876d-ed281ed74285" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8031-b8b6-da4a258d7753" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-803a-8370-c2151521faaa" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">바이너리 데이터</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80b3-999f-d29f79482a8e" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileId}/stream - 파일 실시간 h264 변환 스트리밍 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8013-9299-d16df238342c" class="block-color-teal_background">파일을 스트리밍하는 API<br/>브라우저가 해당 코덱을 지원하지 않을 때 h264로 변환해서 스트리밍</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8082-ae7c-fbb73991f723" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ac-a95a-c2549f784a8f" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80b5-8a50-c5248bebf58f" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 조회할 파일 ID
+
+[Query]
+start: double // 스트리밍 시작 초</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806c-a6a5-f5997e701b15" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8081-b6d7-d5474dececce" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8068-a79c-f1db36c2bd63" class=""><code>Status: 206</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8034-a554-cbbbedfb1fbf" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">바이너리</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="379214c9-48c3-80f4-84bb-c5f6f2d4c5af" class="toggle"><li><details open=""><summary>[GET] /api/v2/files/{fileId}/stream/{hlsFile} - 파일 실시간 HLS 변환 스트리밍 *</summary><div style="display:contents" dir="auto"><blockquote id="379214c9-48c3-80f6-ac29-d97c7e6dd1a7" class="block-color-teal_background">파일을 스트리밍하는 API<br/>브라우저가 해당 코덱을 지원하지 않을 때 HLS로 변환해서 스트리밍</blockquote></div><div style="display:contents" dir="auto"><p id="379214c9-48c3-8026-b959-de3bbd9470a7" class="">
+</p></div><div style="display:contents" dir="auto"><p id="379214c9-48c3-80ce-ade0-ed38a5b96ea7" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="379214c9-48c3-80ff-8e0a-cb411b324321" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+fileId: 조회할 파일 ID
+hlsFile: 조회할 HLS 파일</code></pre></div><div style="display:contents" dir="auto"><p id="379214c9-48c3-80a7-8c8c-c8deb3bee06e" class="">
+</p></div><div style="display:contents" dir="auto"><p id="379214c9-48c3-8083-ae50-d055dc815de1" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="379214c9-48c3-80ef-bcda-c698fb8cb39c" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="379214c9-48c3-80d8-880f-c2bd5bee3933" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">바이너리</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f1214c9-48c3-8047-8838-d14b8c04512d" class="">
+</p></div><div style="display:contents" dir="auto"><h3 id="2f0214c9-48c3-8081-b9ef-d53b3bf9c708" class="">공유 파일</h3></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8098-98df-c76430369cd3" class="toggle"><li><details open=""><summary>[GET] /api/v2/auth/files/{shareKey} - 공유한 파일 정보 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-806c-aff0-c28b48af13ed" class="block-color-teal_background">외부 사용자가 공유 링크로 파일에 접근하는 API<br/>shareKey를 제외한 모든 요청과 응답은 기본 API와 같다.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8076-9a66-d2e9fdf0d955" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f9-8e56-ee78ea07a88f" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80ad-a5ba-e00ba7f41f92" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareKey: 공유된 파일의 고유한 uuid</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80b3-a675-f85d7dc30abb" class="toggle"><li><details open=""><summary>[GET] /api/v2/auth/files/{shareKey}/content - 공유 파일 다운로드 &amp; 직접 스트리밍 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-803a-a45f-d20d6fb2605a" class="block-color-teal_background">외부 사용자가 공유 링크로 파일에 접근하는 API<br/>shareKey를 제외한 모든 요청과 응답은 기본 API와 같다.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f8-bde3-f24dfeea948f" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80d9-bea9-deabaf29af84" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8060-a8e3-e11c7e4fe347" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareKey: 공유된 파일의 고유한 uuid</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80d3-9ec1-ca7f5c1abb99" class="toggle"><li><details open=""><summary>[GET] /api/v2/auth/files/{shareKey}/stream - 공유 파일 실시간 h264 변환 스트리밍 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80a2-af0f-ccddd49facb6" class="block-color-teal_background">외부 사용자가 공유 링크로 파일에 접근하는 API<br/>shareKey를 제외한 모든 요청과 응답은 기본 API와 같다.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8055-a5ee-e4d1e2b0cdfe" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8041-b7f2-c92f0095cfa4" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-808b-8753-ef08bf1a45e1" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareKey: 공유된 파일의 고유한 uuid
+
+[Query]
+start: double // 스트리밍 시작 초</code></pre></div><div style="display:contents" dir="auto"><p id="36c214c9-48c3-80a9-8ed6-c2d905e7c02b" class="">
+</p></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="38f214c9-48c3-800f-b063-d881b7ffa2e0" class="toggle"><li><details open=""><summary>[GET] /api/v2/auth/files/{shareKey}/stream/{hlsFile} - 공유 파일 실시간 HLS 변환 스트리밍 *</summary><div style="display:contents" dir="auto"><blockquote id="38f214c9-48c3-80cf-bb97-df47b026e952" class="block-color-teal_background">외부 사용자가 공유 링크로 파일에 접근하는 API<br/>shareKey를 제외한 모든 요청과 응답은 기본 API와 같다.</blockquote></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-8052-b3b2-f3495664d106" class="">
+</p></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-802d-93be-cd062f357728" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="38f214c9-48c3-800c-a244-d6b19be19276" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareKey: 공유된 파일의 고유한 uuid
+hlsFile: 조회할 HLS 파일</code></pre></div><div style="display:contents" dir="auto"><p id="38f214c9-48c3-8090-b4c7-f23f5c284225" class="">
+</p></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80c2-903e-d068a66d4ae3" class="toggle"><li><details open=""><summary>[GET] /api/v2/auth/files/{shareKey}/thumbnail - 공유 파일 썸네일 조회</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-800f-a160-f3d65b846814" class="block-color-teal_background">외부 사용자가 공유 링크로 파일에 접근하는 API<br/>shareKey를 제외한 모든 요청과 응답은 기본 API와 같다.</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-800f-8cf5-c7ae313bc180" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8036-8df8-d5ee7b3e0aab" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8085-ba2a-c5a1e52ab39c" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareKey: 공유된 파일의 고유한 uuid</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8031-8706-d6db721a2580" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="2f0214c9-48c3-8088-bebd-eb40fc4b4d6d" class="">폴더 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-80af-80f0-f7996b826be6"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-807f-8b64-fb99f8b3c5bf" class="toggle"><li><details open=""><summary>[POST] /api/v2/folders - 폴더 생성 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8076-9fed-c9637e8df726" class="block-color-teal_background">폴더 생성하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80d0-afcf-da5ecfbad387" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-809b-a997-e6007a05be4a" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-803d-86a9-e4b92a5b50a1" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;parentFolderId&quot; : Long, //상위 폴더 ID
+    &quot;name&quot; : String //폴더 이름
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-809b-bc7f-d3ef0827cbed" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80f5-a17c-cc0c7aaac440" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-801e-a6d7-d018de59a97f" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-805f-baee-f02ef85113ba" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;id&quot;: 0,
+  &quot;ownerId&quot;: 0, // 폴더 생성한 유저 아이디
+  &quot;parentFolderId&quot;: 0, // 상위 폴더 아이디
+  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로(자신 포함)
+  &quot;name&quot;: &quot;string&quot;, // 폴더명
+  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 폴더 최종 수정일
+  &quot;createdAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 처음 들어온 시점
+  &quot;updatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 마지막 수정 시점
+  &quot;isRoot&quot;: true // 루트 폴더 여부
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-808c-884f-e74c62b0df9b" class="toggle"><li><details open=""><summary>[GET] /api/v2/folders/{folderId} - 폴더 정보 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8012-9003-f0f6f745d3cb" class="block-color-teal_background">폴더 정보 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-807a-a84a-efa40343fe63" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8012-890e-fdfc9062e5c0" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80ae-98f8-dbf1fa97d3ec" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+folderId: 조회할 폴더 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80a2-9091-df94973608dd" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-805c-88f5-c978810bd31c" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c2-9322-e4b9d0393b55" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8039-9268-fbf3a424d0c8" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;id&quot;: 0,
+  &quot;ownerId&quot;: 0, // 폴더 생성한 유저 아이디
+  &quot;parentFolderId&quot;: 0, // 상위 폴더 아이디
+  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로(자신 포함)
+  &quot;name&quot;: &quot;string&quot;, // 폴더명
+  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 폴더 최종 수정일
+  &quot;createdAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 처음 들어온 시점
+  &quot;updatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 마지막 수정 시점
+  &quot;isRoot&quot;: true // 루트 폴더 여부
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80a9-99f0-caee70592c3d" class="toggle"><li><details open=""><summary>[GET] /api/v2/folders/{folderId}/content - 폴더 다운로드 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8016-aed4-e49728c44621" class="block-color-teal_background">폴더 다운로드하는 API<br/>압축해서 폴더 전체를 다운로드</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8088-88a5-d308603bfe2d" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-805b-9739-fdd395a93afe" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8081-b019-c9244fa04255" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+folderId: 다운할 폴더 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8066-a348-f5ffa321f652" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80a3-b994-cfba17ef6518" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8092-a0ee-f5c6ae6887ea" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8072-b4fc-f5fa9664fd79" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">zip 파일 바이너리
+
+X-Total-Size 헤더에 압축안한 원본 파일들의 크기가 적혀있음.</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8070-a803-f6bb052c0c69" class="toggle"><li><details open=""><summary>[PATCH] /api/v2/folders/{folderId} - 폴더 정보 수정 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80f8-8a08-f86adf506aa0" class="block-color-teal_background">폴더 정보 수정하는 API<br/>여기서 폴더 이동 가능 (폴더 이동하면 내부 파일 및 폴더 전부 이동)</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-800c-bf63-cb25f7071b9f" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8004-805c-f28acf62d63b" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8068-bbf0-cd147edee775" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+folderId: 수정할 폴더 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-807f-8836-f60b0738ee42" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806f-8b05-cc4e8bfd1158" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-802e-b96e-e90784b9d45f" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;parentFolderId&quot; : Long, //옮길 상위 폴더 ID
+    &quot;name&quot; : String //폴더 이름
+}</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806f-aeea-f7485752df1d" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8099-a0cd-f041c082db9d" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ed-9200-cea1b7901384" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8005-853c-ea5aefb84dff" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;id&quot;: 0,
+  &quot;ownerId&quot;: 0, // 폴더 생성한 유저 아이디
+  &quot;parentFolderId&quot;: 0, // 상위 폴더 아이디
+  &quot;relativePath&quot;: &quot;string&quot;, // 상대 경로(자신 포함)
+  &quot;name&quot;: &quot;string&quot;, // 폴더명
+  &quot;originUpdatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 폴더 최종 수정일
+  &quot;createdAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 처음 들어온 시점
+  &quot;updatedAt&quot;: &quot;2026-05-26T07:40:22.562Z&quot;, // 서버에 폴더 마지막 수정 시점
+  &quot;isRoot&quot;: true // 루트 폴더 여부
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-804a-8806-d3b6a2a77c6c" class="toggle"><li><details open=""><summary>[DELETE] /api/v2/folders/{folderId} - 폴더 휴지통으로 이동 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8017-b878-d8dc93dc808a" class="block-color-teal_background">폴더 삭제하는 API<br/>여기서 삭제하면 하위 폴더 및 파일 전부 삭제 됨</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ce-b010-fe65e191b413" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c6-baa1-c3903935fbe0" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-809f-a1fe-f40469736916" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+folderId: 삭제할 폴더 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c9-9158-d72f9f709b1b" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8030-86fe-c979d5694783" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8021-9b98-f6d9b763b2d9" class=""><code>Status: 204</code></p></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-8062-b1d4-f79b702a5baa" class="toggle"><li><details open=""><summary>[POST] /api/v2/folders/{folderId}/sync - 디스크와 폴더 정보 동기화 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-802d-8b4c-d046707f00dc" class="block-color-teal_background">디스크에 저장된 정보와 DB의 정보를 동기화하는 API<br/>OS에서 직접 파일을 추가, 수정, 삭제한 경우에 사용하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8024-89f6-f2c89e201776" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80ab-9902-dbf43dba7047" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80d3-b2f7-fcfc01d70aae" class=""><code>Status: 200</code> </p></div><div style="display:contents" dir="auto"><pre id="37f214c9-48c3-8000-8f02-fd209e2c197e" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;createdFolders&quot;: [
+      &quot;userA/docs/new&quot;
+    ],
+    &quot;createdFiles&quot;: [
+      &quot;userA/docs/new/new.txt&quot;
+    ],
+    &quot;updatedFiles&quot;: [
+      &quot;userA/docs/existing.txt&quot;
+    ],
+    &quot;deletedFolders&quot;: [
+      &quot;userA/docs/stale&quot;
+    ],
+    &quot;deletedFiles&quot;: [
+      &quot;userA/docs/stale/old.txt&quot;
+    ],
+    &quot;skipped&quot;: [],
+    &quot;errors&quot;: []
+ }</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-8020-9954-e598fdb7ce67" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="2f0214c9-48c3-80ab-aa8f-cb5aaa3dfb51" class="">공유 링크 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-8081-a840-fd5c7d0652e6"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80d1-bd05-e8c715f7cf82" class="toggle"><li><details open=""><summary>[DELETE] /api/v2/shares/{shareId} - 생성한 공유 링크 삭제 *</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-8072-a20b-c67cedf49a47" class="block-color-teal_background">공유 링크 삭제하는 API<br/>/api/v2/users/{userId}/shares에서 목록 확인후 삭제</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80d6-89b4-dd684d4ba216" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80b2-9b41-ebd9a5ecfd5f" class=""><strong>Parameter</strong></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80d5-8943-e3107b01a792" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">[Path]
+shareId: 삭제할 공유 링크 ID</code></pre></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-801c-af87-d4abb632a147" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80eb-add4-eb694c51118c" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8092-a4d4-f38c2c650d39" class=""><code>Status: 204</code></p></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-80c1-bdb9-fcd5ccb880ba" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="2f0214c9-48c3-805f-8ad9-ef504615f737" class="">시스템 API</h2></div><div style="display:contents" dir="auto"><hr id="2f0214c9-48c3-80d9-88e4-eb28e462a8ec"/></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-808d-9e14-cfe125bb2b0b" class="toggle"><li><details open=""><summary>[GET] /api/v2/system/status - 시스템 상태 조회</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-800c-abc2-e2a68fe4e0b7" class="block-color-teal_background">시스템 정보 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8058-afa2-fbb423ebee72" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-800f-a996-ca63956597e1" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-803e-a31d-dd93698f097f" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-80bb-a8b4-de3c92f38c6f" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;diskFree&quot; : Long //남은 용량 (바이트)
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="2f0214c9-48c3-80f3-a053-c57aadecc4bb" class="toggle"><li><details open=""><summary>[GET] /api/v2/system/health - DB 연결 상태 등 가용성 조회</summary><div style="display:contents" dir="auto"><blockquote id="2f0214c9-48c3-80fa-926e-eab88cc12200" class="block-color-teal_background">시스템 가용성 조회하는 API</blockquote></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-806a-8f64-c970a9261538" class="">
+</p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8098-ad23-e764fd2cb3a8" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8041-b5df-f6d2489f63ca" class=""><code>Status: 200</code></p></div><div style="display:contents" dir="auto"><pre id="2f0214c9-48c3-8044-8050-d2cfb244bae2" class="code code-wrap"><code class="language-json" style="white-space:pre-wrap;word-break:break-all">{
+    &quot;status&quot; : &quot;good&quot;
+}</code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="380214c9-48c3-8070-a8ed-de9c71eb1bac" class="toggle"><li><details open=""><summary>[GET] /api/v2/transcoding/settings - 트랜스코딩 설정 조회 *</summary><div style="display:contents" dir="auto"><blockquote id="380214c9-48c3-80bd-8f99-f144128c288e" class="block-color-teal_background">현재 설정된 트랜스코딩 설정 조회</blockquote></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-8096-93d4-cb3d1b936a69" class="">
+</p></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-8000-925a-feeffa7a1ba2" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-80be-a1a4-e88d1401b328" class=""><code>Status: 200</code> </p></div><div style="display:contents" dir="auto"><pre id="380214c9-48c3-80cd-9e08-f6c026c718e7" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">{                                                                                                                                                                             
+    &quot;hwAccel&quot;: &quot;CUDA&quot;,                                                                                                                                                          
+    &quot;h264Encoder&quot;: &quot;H264_NVENC&quot;,                                                                                                                                                
+    &quot;quality&quot;: &quot;P1080&quot;,                                                                                                                                                         
+    &quot;availableHwAccels&quot;: [&quot;NONE&quot;,&quot;CUDA&quot;,&quot;QSV&quot;,&quot;VIDEOTOOLBOX&quot;,&quot;V4L2M2M&quot;,&quot;DRM&quot;],                                                                                                  
+    &quot;availableEncoders&quot;: [&quot;LIBX264&quot;,&quot;H264_NVENC&quot;,&quot;H264_QSV&quot;,&quot;H264_VIDEOTOOLBOX&quot;,&quot;H264_V4L2M2M&quot;],                                                                                
+    &quot;availableQualities&quot;: [&quot;P480&quot;,&quot;P720&quot;,&quot;P1080&quot;]                                                                                                                               
+  }  </code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><ul id="380214c9-48c3-8047-856e-eefda58b7c6b" class="toggle"><li><details open=""><summary>[PUT] /api/v2/transcoding/settings - 트랜스코딩 설정 변경 *</summary><div style="display:contents" dir="ltr"><figure id="380214c9-48c3-808d-99f1-dd6a0f1599ab" class="image"><img style="width:2056px" src="https://prod-files-secure.s3.us-west-2.amazonaws.com/a38313d1-8c0a-4772-91c4-f7a9d57fc434/45a2a645-94fa-4814-b00c-e68df08d53fc/%E1%84%89%E1%85%B3%E1%84%8F%E1%85%B3%E1%84%85%E1%85%B5%E1%86%AB%E1%84%89%E1%85%A3%E1%86%BA_2026-06-16_%E1%84%8B%E1%85%A9%E1%84%8C%E1%85%A5%E1%86%AB_8.16.08.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&amp;X-Amz-Credential=ASIAZI2LB46654JW2SXT%2F20260630%2Fus-west-2%2Fs3%2Faws4_request&amp;X-Amz-Date=20260630T080040Z&amp;X-Amz-Expires=21600&amp;X-Amz-Security-Token=IQoJb3JpZ2luX2VjEPj%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLXdlc3QtMiJHMEUCIQDCRTxRtIUSwxUwTWYVwDAIjPyIfEJV37s02ryEqTogugIgEKCiz%2BfRug7nDs0%2Bf5B%2BTBbZravjdTvk4g1Z%2BzOQh4wqiAQIwf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARAAGgw2Mzc0MjMxODM4MDUiDNT3nsgJWnSX9GPSfSrcA0%2FDx%2FRLZUSGSXVBEiT9e6Tx6zPFlAMYmjVqdK9xWWPbqp9ckk14upao6rbYJP%2B8JrDUxf2nyTpSXWNdlHEGWmhLIqYSaynl2lAe48B2yq6OFHV6jKIfI3%2BxFBpB8yBYYzjuEwLgR%2FdTMzpx0BXDuGrwl3jKqpBb3DjkLYhhjc9Ulor3vNrDU6HyyFewg%2BDLr3%2Fi38wLVkd1irj95q%2B94Q0kY5hO1bcUKc63kvGQmi65kxm2VnXCAiJHjHifUsOp2U2PMtIagW85%2BFBSQgA%2FaQ74tzdpc14e%2FkKr2Zi1jZoPbqUpDBISZJGHIOu%2FFBaTU%2FeYxHX2RQjVVEeiisidywnfPcY0X8dzcNGBSXUt2Wi9YDwUxDP0y1NBS8IJddTSkC83AhfVc73kApZYmlHd2l05IUPhiuAYo1uTvtqDQvrpxzX1jf0d6f1aYTyvt7mcZNjanxlgS3F%2F4HSwMBoPxuLQAoax0FOsGeBsFAh%2FuXiznWQaKKtrpmZMz2fmOZn%2B5PHvratCnmWM3T2lPf1Mn9zbigkYgFY5LbbRrOgnLAxgCOTO2NeJx4ylExDrT9TjKcjQxhvBe29gqBUlCuvQOCATQ1me4obykXv2n1zQfwMfRJM8pO%2Fhqb5hDIpyMIrrjdIGOqUBTt6OHT4K6na%2FSqKqNiRExXqfzGKP81RwpF1qaIcqOn51PJKvsrsdYEHizRZGLFwByYDi%2F8H6Zph01USxs2ueRrY4z17KffqH7xlqDIhclx8JYW9u4e9kc2nuY71mvBqJai%2BYMBNuu0sTQTZm6XFaecu7F6W8CttRU6owbd3rEnZePJ3FdMGg6nT5TWgQJnFKFiepiADI1VQl1iiZzn8jMKVPgWD7&amp;X-Amz-Signature=1a46d2b0e9f3db2a5ea92dfb4594b4f386e85b644974e1b03f8f5b71b4746364&amp;X-Amz-SignedHeaders=host&amp;x-amz-checksum-mode=ENABLED&amp;x-id=GetObject"/></figure></div><div style="display:contents" dir="auto"><blockquote id="380214c9-48c3-8060-969c-ffb07782fa0c" class="block-color-teal_background">현재 설정된 트랜스코딩 설정 변경</blockquote></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-8098-8408-efe825ff5ad4" class=""><strong>Request Body</strong></p></div><div style="display:contents" dir="auto"><pre id="380214c9-48c3-807f-9aae-dcb26cc56774" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">{ &quot;hwAccel&quot;: &quot;NONE&quot;, &quot;h264Encoder&quot;: &quot;LIBX264&quot;, &quot;quality&quot;: &quot;P720&quot; } </code></pre></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-8051-b5fc-f3d6d633b87a" class="">
+</p></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-807e-bb35-cdc36a4b15b5" class=""><strong>Response Body</strong></p></div><div style="display:contents" dir="auto"><p id="380214c9-48c3-80fa-94f0-fe9e4d2e020f" class=""><code>Status: 200</code> </p></div><div style="display:contents" dir="auto"><pre id="380214c9-48c3-8035-8df0-dd2a19291f88" class="code code-wrap"><code class="language-cpp" style="white-space:pre-wrap;word-break:break-all">{                                                                                                                                                                             
+    &quot;hwAccel&quot;: &quot;CUDA&quot;,                                                                                                                                                          
+    &quot;h264Encoder&quot;: &quot;H264_NVENC&quot;,                                                                                                                                                
+    &quot;quality&quot;: &quot;P1080&quot;,                                                                                                                                                         
+    &quot;availableHwAccels&quot;: [&quot;NONE&quot;,&quot;CUDA&quot;,&quot;QSV&quot;,&quot;VIDEOTOOLBOX&quot;,&quot;V4L2M2M&quot;,&quot;DRM&quot;],                                                                                                  
+    &quot;availableEncoders&quot;: [&quot;LIBX264&quot;,&quot;H264_NVENC&quot;,&quot;H264_QSV&quot;,&quot;H264_VIDEOTOOLBOX&quot;,&quot;H264_V4L2M2M&quot;],                                                                                
+    &quot;availableQualities&quot;: [&quot;P480&quot;,&quot;P720&quot;,&quot;P1080&quot;]                                                                                                                               
+  }  </code></pre></div></details></li></ul></div><div style="display:contents" dir="auto"><p id="2f0214c9-48c3-8058-be8d-d0db9cfaa195" class="">
+</p></div></div></article></body></html>
