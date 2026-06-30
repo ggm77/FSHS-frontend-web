@@ -45,7 +45,7 @@ const SCREEN_PATHS: Record<Screen, string> = {
 };
 
 const ROUTE_SCREENS = new Set<Screen>(Object.keys(SCREEN_PATHS) as Screen[]);
-const SHARED_FILE_VIEWS = new Set<SharedFilePageView>(['info', 'content', 'stream', 'hls', 'thumbnail']);
+const SHARED_FILE_VIEWS = new Set<SharedFilePageView>(['info', 'content', 'stream', 'hls']);
 
 function isLoginRoute(pathname: string): boolean {
   return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
@@ -123,7 +123,7 @@ function parseMediaRoute(pathname: string): MediaRoute {
 }
 
 function parseSharedFileRoute(pathname: string): SharedFileRoute {
-  const m = pathname.match(/^\/s\/([^/]+)(?:\/(content|stream|hls|thumbnail))?\/?$/);
+  const m = pathname.match(/^\/s\/([^/]+)(?:\/(content|stream|hls))?\/?$/);
   if (!m) return null;
 
   try {

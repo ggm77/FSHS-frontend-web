@@ -18,6 +18,13 @@ interface Props {
   fileId: number | null;
   initialFile?: FileResponseDto | null;
   onBack: () => void;
+  sourceUrls?: {
+    content: string;
+    stream: (start?: number) => string;
+    hls: string;
+  };
+  backLabel?: string;
+  className?: string;
 }
 
 type FullscreenDocument = Document & {
@@ -600,7 +607,7 @@ const TRANSCODE_METHOD: 'hls' | 'stream' =
     ? 'stream'
     : (APPLE_WEBKIT || canPlayManagedHls() || canPlayNativeHls() ? 'hls' : 'stream');
 
-export function VideoScreen({ fileId, initialFile, onBack }: Props) {
+export function VideoScreen({ fileId, initialFile, onBack, sourceUrls, backLabel = '라이브러리로', className }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(initialFile || null);
   const [playing, setPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -687,15 +694,12 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
   useEffect(() => {
     if (!playing) {
-      setUserActive(true);
       if (activeTimeoutRef.current) {
         window.clearTimeout(activeTimeoutRef.current);
         activeTimeoutRef.current = null;
       }
-    } else {
-      handleMouseMove();
     }
-  }, [handleMouseMove, playing]);
+  }, [playing]);
 
   function toggleFullscreen() {
     const el = containerRef.current;
@@ -735,18 +739,23 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   }
 
   useEffect(() => {
-    setError(null);
-    setFile(initialFile || null);
-    setAutoStream(false);
-    setForcedMode(null);
-    setShowSettings(false);
-    resumeAtRef.current = null;
-    playRequestedRef.current = true;
-    prebufferingRef.current = false;
-    prebufferRunRef.current += 1;
-    setDuration(0);
-    setStreamStart(0);
-    setWaiting(false);
+    const timeoutId = window.setTimeout(() => {
+      setError(null);
+      setFile(initialFile || null);
+      setAutoStream(false);
+      setForcedMode(null);
+      setShowSettings(false);
+      resumeAtRef.current = null;
+      playRequestedRef.current = true;
+      prebufferingRef.current = false;
+      prebufferRunRef.current += 1;
+      setDuration(0);
+      setStreamStart(0);
+      setWaiting(false);
+      setUserActive(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [fileId, initialFile]);
 
   useEffect(() => {
@@ -768,7 +777,6 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
     };
 
     if (initialFile && initialFile.id === fileId) {
-      setFile(initialFile);
       configureFile(initialFile);
     } else {
       getFile(fileId).then(f => {
@@ -791,8 +799,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
 
   const videoSrc = (fileId != null && file != null)
     ? (useTranscode
-        ? (TRANSCODE_METHOD === 'hls' ? getFileHlsUrl(fileId) : getFileStreamUrl(fileId, streamStart))
-        : getFileContentUrl(fileId, false))
+        ? (TRANSCODE_METHOD === 'hls'
+            ? (sourceUrls?.hls ?? getFileHlsUrl(fileId))
+            : (sourceUrls?.stream(streamStart) ?? getFileStreamUrl(fileId, streamStart)))
+        : (sourceUrls?.content ?? getFileContentUrl(fileId, false)))
     : '';
 
   // hls.js 또는 네이티브 소스 로드
@@ -1120,7 +1130,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
   return (
     <div
       ref={containerRef}
-      className={`video-page${isFullscreen ? ' is-fullscreen' : ''}${hideControls ? ' hide-controls' : ''}`}
+      className={`video-page${className ? ` ${className}` : ''}${isFullscreen ? ' is-fullscreen' : ''}${hideControls ? ' hide-controls' : ''}`}
       onMouseMove={handleMouseMove}
       onClick={handleMouseMove}
     >
@@ -1145,7 +1155,10 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
               }
               clearWaitingIfReady();
             }}
-            onPlay={() => setPlaying(true)}
+            onPlay={() => {
+              setPlaying(true);
+              handleMouseMove();
+            }}
             onPause={() => {
               setPlaying(false);
               if (!prebufferingRef.current) setWaiting(false);
@@ -1215,7 +1228,7 @@ export function VideoScreen({ fileId, initialFile, onBack }: Props) {
         )}
 
         <button className="video-back" onClick={onBack}>
-          <Icon name="chevronL" size={14} /> 라이브러리로
+          <Icon name="chevronL" size={14} /> {backLabel}
         </button>
 
         {file && (

@@ -1,7 +1,7 @@
 import { request, BASE } from './client';
 import type { ShareResponseDto, UserSharesResponseDto } from '../types';
 
-export type SharedFilePageView = 'info' | 'content' | 'stream' | 'hls' | 'thumbnail';
+export type SharedFilePageView = 'info' | 'content' | 'stream' | 'hls';
 
 export function createFileShare(fileId: number): Promise<ShareResponseDto> {
   return request(`/files/${fileId}/shares`, { method: 'POST' });

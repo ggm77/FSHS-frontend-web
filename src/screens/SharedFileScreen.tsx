@@ -4,6 +4,7 @@ import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { formatBytes } from '../api/files';
+import { VideoScreen } from './VideoScreen';
 import {
   downloadSharedFileContent,
   getSharedFile,
@@ -23,10 +24,7 @@ interface SharedFileScreenProps {
 
 const VIEW_ITEMS: { id: SharedFilePageView; label: string; icon: string }[] = [
   { id: 'info', label: '정보', icon: 'info' },
-  { id: 'content', label: '원본', icon: 'doc' },
-  { id: 'stream', label: 'H.264', icon: 'video' },
-  { id: 'hls', label: 'HLS', icon: 'cast' },
-  { id: 'thumbnail', label: '썸네일', icon: 'image' },
+  { id: 'content', label: '미리보기', icon: 'eye' },
 ];
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -264,7 +262,7 @@ function SharedFileIcon({ file, size = 46 }: { file: FileResponseDto | null; siz
 }
 
 function getPreferredView(file: FileResponseDto): SharedFilePageView {
-  if (file.category === 'VIDEO') return 'hls';
+  if (file.category === 'VIDEO') return 'content';
   return 'content';
 }
 
@@ -748,7 +746,22 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
     }
 
     if (file.category === 'VIDEO') {
-      return <SharedVideoPlayer shareKey={shareKey} file={file} mode="content" />;
+      return (
+        <div className="shared-video-player">
+          <VideoScreen
+            fileId={file.id}
+            initialFile={file}
+            onBack={() => selectView('info')}
+            backLabel="파일 정보로"
+            className="shared-video-screen"
+            sourceUrls={{
+              content: getSharedFileContentUrl(shareKey, false),
+              stream: (start = 0) => getSharedFileStreamUrl(shareKey, start),
+              hls: getSharedFileHlsUrl(shareKey),
+            }}
+          />
+        </div>
+      );
     }
 
     if (file.category === 'AUDIO') {
@@ -804,13 +817,6 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
 
     if (view === 'info') return renderInfo();
     if (view === 'content') return renderContentView();
-    if (view === 'thumbnail') {
-      return (
-        <div className="shared-media-frame thumbnail">
-          <img src={getSharedFileThumbnailUrl(shareKey)} alt={`${file.name} 썸네일`} />
-        </div>
-      );
-    }
     if (view === 'stream' || view === 'hls') {
       if (file.category !== 'VIDEO') {
         return (
@@ -1180,8 +1186,7 @@ const sharedFileStyles = `
     place-items: center;
     background: #10131d;
   }
-  .shared-media-frame.image img,
-  .shared-media-frame.thumbnail img {
+  .shared-media-frame.image img {
     max-width: 100%;
     max-height: 76vh;
     object-fit: contain;
@@ -1199,6 +1204,14 @@ const sharedFileStyles = `
     max-height: 74vh;
     background: #000;
     border-radius: 8px;
+  }
+  .shared-video-player {
+    height: min(76vh, 720px);
+    min-height: 520px;
+    background: #10131d;
+  }
+  .shared-video-player .video-page {
+    height: 100%;
   }
   .shared-audio-frame,
   .shared-doc-loader,
@@ -1436,6 +1449,10 @@ const sharedFileStyles = `
     }
     .shared-video {
       max-height: 62vh;
+    }
+    .shared-video-player {
+      height: min(70vh, 640px);
+      min-height: 360px;
     }
     .viewer-text-wrap,
     .viewer-office-wrap {
