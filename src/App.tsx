@@ -9,19 +9,22 @@ import { VideoScreen } from './screens/VideoScreen';
 import { ViewerScreen } from './screens/ViewerScreen';
 import { SearchScreen } from './screens/SearchScreen';
 import { ShareScreen } from './screens/ShareScreen';
+import { SharedFileScreen } from './screens/SharedFileScreen';
 import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { TranscodingScreen } from './screens/TranscodingScreen';
 import { logout } from './api/auth';
 import { getUser } from './api/users';
 import { ApiError } from './api/client';
+import type { SharedFilePageView } from './api/shares';
 import type { UserResponseDto, FileResponseDto } from './types';
 
 type Screen = 'files' | 'gallery' | 'search' | 'share' | 'users' | 'settings' | 'admin' | 'transcoding';
 
-// 미디어 재생 하위 페이지 라우트: /video/:fileId, /viewer/:fileId
-// 화면 경로와 미디어 경로 모두 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
+// 하위 페이지 라우트: /video/:fileId, /viewer/:fileId, /s/:shareKey
+// 화면 경로와 하위 페이지 경로 모두 정적 서버에 SPA fallback이 필요하다. (nginx: try_files $uri /index.html;)
 type MediaRoute = { type: 'video' | 'viewer'; fileId: number } | null;
+type SharedFileRoute = { shareKey: string; view: SharedFilePageView } | null;
 const LOGIN_PATH = '/login';
 const SCREEN_STORAGE_KEY = 'last-screen';
 const LIGHT_THEME_COLOR = '#ffffff';
@@ -42,6 +45,7 @@ const SCREEN_PATHS: Record<Screen, string> = {
 };
 
 const ROUTE_SCREENS = new Set<Screen>(Object.keys(SCREEN_PATHS) as Screen[]);
+const SHARED_FILE_VIEWS = new Set<SharedFilePageView>(['info', 'content', 'stream', 'hls', 'thumbnail']);
 
 function isLoginRoute(pathname: string): boolean {
   return pathname === LOGIN_PATH || pathname === `${LOGIN_PATH}/`;
@@ -96,6 +100,7 @@ function saveStoredScreen(screen: Screen) {
 }
 
 function getInitialScreen(): Screen {
+  if (parseSharedFileRoute(window.location.pathname)) return loadStoredScreen();
   if (parseMediaRoute(window.location.pathname)) return loadStoredScreen();
   return getScreenFromPath(window.location.pathname)
     ?? getScreenFromHistoryState(window.history.state)
@@ -115,6 +120,19 @@ function getHistoryRedirectTo(): string {
 function parseMediaRoute(pathname: string): MediaRoute {
   const m = pathname.match(/^\/(video|viewer)\/(\d+)\/?$/);
   return m ? { type: m[1] as 'video' | 'viewer', fileId: Number(m[2]) } : null;
+}
+
+function parseSharedFileRoute(pathname: string): SharedFileRoute {
+  const m = pathname.match(/^\/s\/([^/]+)(?:\/(content|stream|hls|thumbnail))?\/?$/);
+  if (!m) return null;
+
+  try {
+    const view = (m[2] || 'info') as SharedFilePageView;
+    if (!SHARED_FILE_VIEWS.has(view)) return null;
+    return { shareKey: decodeURIComponent(m[1]), view };
+  } catch {
+    return null;
+  }
 }
 
 function setMetaContent(name: string, content: string) {
@@ -351,6 +369,7 @@ export default function App() {
   const [dark, setDark] = useState(getInitialDarkMode);
   const [user, setUser] = useState<UserResponseDto | null>(() => loadCachedUser());
   const [mediaRoute, setMediaRoute] = useState<MediaRoute>(() => parseMediaRoute(window.location.pathname));
+  const [sharedFileRoute, setSharedFileRoute] = useState<SharedFileRoute>(() => parseSharedFileRoute(window.location.pathname));
   const [loginRoute, setLoginRoute] = useState(() => isLoginRoute(window.location.pathname));
   // 목록에서 이미 받아 둔 파일 정보. 비디오 페이지가 메타데이터 재요청 없이 바로 재생을 시작하게 해준다.
   const [videoFile, setVideoFile] = useState<FileResponseDto | null>(null);
@@ -386,8 +405,13 @@ export default function App() {
     // Initialize history state on mount
     if (!window.history.state) {
       const initialScreen = getInitialScreen();
+      const initialSharedFileRoute = parseSharedFileRoute(window.location.pathname);
       window.history.replaceState(
-        loginRoute ? { screen: 'login', redirectTo: getScreenPath(initialScreen) } : { screen: initialScreen },
+        loginRoute
+          ? { screen: 'login', redirectTo: getScreenPath(initialScreen) }
+          : initialSharedFileRoute
+            ? { sharedFile: true, view: initialSharedFileRoute.view }
+            : { screen: initialScreen },
         '',
       );
     }
@@ -395,6 +419,15 @@ export default function App() {
     // 주소(경로)와 history state를 화면에 동기화한다.
     // 경로가 미디어 라우트면 하위 페이지를 띄우고, 아니면 항목에 기록된 메인 화면을 복원한다.
     const syncFromLocation = () => {
+      const sharedRoute = parseSharedFileRoute(window.location.pathname);
+      setSharedFileRoute(sharedRoute);
+      if (sharedRoute) {
+        setLoginRoute(false);
+        setMediaRoute(null);
+        setVideoFile(null);
+        return;
+      }
+
       const isLogin = isLoginRoute(window.location.pathname);
       setLoginRoute(isLogin);
       if (isLogin) {
@@ -422,6 +455,7 @@ export default function App() {
 
   useEffect(() => {
     const isLogin = isLoginRoute(window.location.pathname);
+    const isSharedFile = parseSharedFileRoute(window.location.pathname) !== null;
 
     if (authed) {
       if (!isLogin) return;
@@ -433,7 +467,7 @@ export default function App() {
       return;
     }
 
-    if (isLogin) return;
+    if (isLogin || isSharedFile) return;
 
     const redirectTo = getCurrentLocationPath();
     window.history.replaceState({ screen: 'login', redirectTo }, '', LOGIN_PATH);
@@ -578,6 +612,10 @@ export default function App() {
       setMediaRoute(null);
       setVideoFile(null);
     }
+  }
+
+  if (sharedFileRoute) {
+    return <SharedFileScreen shareKey={sharedFileRoute.shareKey} view={sharedFileRoute.view} />;
   }
 
   if (!authed) {

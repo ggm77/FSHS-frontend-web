@@ -5,7 +5,8 @@ import { Icon } from './Icon';
 export type OfficePreviewKind = 'word' | 'powerpoint';
 
 interface Props {
-  fileId: number;
+  fileId?: number;
+  contentUrl?: string;
   kind: OfficePreviewKind;
   onError: (message: string) => void;
 }
@@ -16,9 +17,10 @@ function getErrorMessage(err: unknown): string {
     : '문서 미리보기를 불러올 수 없습니다.';
 }
 
-export function OfficePreview({ fileId, kind, onError }: Props) {
+export function OfficePreview({ fileId, contentUrl, kind, onError }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
+  const previewUrl = contentUrl ?? (fileId != null ? getFileContentUrl(fileId, false) : null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -33,7 +35,9 @@ export function OfficePreview({ fileId, kind, onError }: Props) {
     onError('');
 
     async function renderPreview(previewContainer: HTMLDivElement) {
-      const response = await fetch(getFileContentUrl(fileId, false), {
+      if (!previewUrl) throw new Error('문서 미리보기 URL이 없습니다.');
+
+      const response = await fetch(previewUrl, {
         credentials: 'include',
         signal: controller.signal,
       });
@@ -119,7 +123,7 @@ export function OfficePreview({ fileId, kind, onError }: Props) {
       pptxViewer?.destroy();
       container.replaceChildren();
     };
-  }, [fileId, kind, onError]);
+  }, [kind, onError, previewUrl]);
 
   return (
     <div className="viewer-office-scroll">
