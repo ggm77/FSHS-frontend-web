@@ -398,16 +398,12 @@ const galleryStyles = `
     margin-bottom: 30px;
   }
   .gallery-day-h {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
-    padding: 7px 0;
-    background: var(--bg-shell);
+    margin: 6px 0 10px;
+    padding: 0;
   }
   .gallery-day-h .d {
     min-width: 0;
@@ -552,7 +548,6 @@ const galleryStyles = `
       grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
     }
     .gallery-day-h {
-      top: 0;
       margin-bottom: 6px;
     }
   }
