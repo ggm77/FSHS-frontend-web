@@ -14,7 +14,7 @@ import { UsersScreen } from './screens/UsersScreen';
 import { AdminScreen } from './screens/AdminScreen';
 import { TranscodingScreen } from './screens/TranscodingScreen';
 import { logout } from './api/auth';
-import { getUser } from './api/users';
+import { getCurrentUser } from './api/users';
 import { ApiError } from './api/client';
 import type { SharedFilePageView } from './api/shares';
 import type { UserResponseDto, FileResponseDto } from './types';
@@ -494,7 +494,7 @@ export default function App() {
 
     // 캐시된 정보로 이미 로그인 상태를 보여주고 있으므로,
     // 백그라운드에서 세션이 유효한지만 조용히 확인한다.
-    getUser(cached.id)
+    getCurrentUser()
       .then(verified => {
         setUser(verified);
         localStorage.setItem('user', JSON.stringify(verified));
@@ -515,32 +515,28 @@ export default function App() {
   // (모바일에서 앱을 장시간 백그라운드로 두면 타이머가 멈춰 효과가 제한적이다.)
   useEffect(() => {
     if (!authed || !user) return;
-    const userId = user.id;
     const timer = setInterval(() => {
-      getUser(userId).catch(err => {
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-          localStorage.removeItem('user');
-          setAuthed(false);
-          setUser(null);
-        }
-      });
+      getCurrentUser()
+        .then(verified => {
+          setUser(verified);
+          localStorage.setItem('user', JSON.stringify(verified));
+        })
+        .catch(err => {
+          if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+            localStorage.removeItem('user');
+            setAuthed(false);
+            setUser(null);
+          }
+        });
     }, 5 * 60 * 1000);
     return () => clearInterval(timer);
   }, [authed, user]);
 
-  async function handleSignIn(uname: string) {
+  async function handleSignIn() {
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    localStorage.setItem('user', JSON.stringify(currentUser));
     setAuthed(true);
-    // Try to find the current user by trying sequential IDs
-    for (let i = 1; i <= 20; i++) {
-      try {
-        const u = await getUser(i);
-        if (u.username === uname) {
-          setUser(u);
-          localStorage.setItem('user', JSON.stringify(u));
-          break;
-        }
-      } catch { break; }
-    }
   }
 
   async function handleLogout() {

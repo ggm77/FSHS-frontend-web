@@ -11,6 +11,10 @@ export function getUser(userId: number): Promise<UserResponseDto> {
   return request(`/users/${userId}`);
 }
 
+export function getCurrentUser(): Promise<UserResponseDto> {
+  return request('/users/me');
+}
+
 export async function createUser(data: CreateUserRequestDto): Promise<CreateUserResponseDto> {
   return request('/users', {
     method: 'POST',

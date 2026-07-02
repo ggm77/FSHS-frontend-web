@@ -3,7 +3,7 @@ import { Icon } from '../components/Icon';
 import { login } from '../api/auth';
 
 interface Props {
-  onSignIn: (username: string) => void;
+  onSignIn: () => Promise<void> | void;
 }
 
 export function LoginScreen({ onSignIn }: Props) {
@@ -21,7 +21,11 @@ export function LoginScreen({ onSignIn }: Props) {
     setError('');
     try {
       await login(username, password, rememberMe);
-      onSignIn(username);
+      try {
+        await onSignIn();
+      } catch {
+        setError('사용자 정보를 불러오지 못했습니다.');
+      }
     } catch {
       setError('아이디 또는 비밀번호가 올바르지 않습니다.');
     } finally {
