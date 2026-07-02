@@ -7,6 +7,16 @@ export interface UserResponseDto {
   updatedAt: string;
 }
 
+export interface UpdateUserRequestDto {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+export type UpdateUserResponseDto = Omit<UserResponseDto, 'id'> & {
+  id?: number;
+};
+
 export interface SimpleFolderResponseDto {
   id: number;
   ownerId: number | null;

@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { UserResponseDto } from '../types';
+import type { UpdateUserRequestDto, UpdateUserResponseDto, UserResponseDto } from '../types';
 
 export function getUser(userId: number): Promise<UserResponseDto> {
   return request(`/users/${userId}`);
@@ -14,8 +14,8 @@ export async function createUser(username: string, password: string): Promise<Us
 
 export async function updateUser(
   userId: number,
-  data: { username?: string; password?: string }
-): Promise<UserResponseDto> {
+  data: UpdateUserRequestDto,
+): Promise<UpdateUserResponseDto> {
   return request(`/users/${userId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

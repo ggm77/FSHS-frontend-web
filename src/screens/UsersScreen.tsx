@@ -11,7 +11,8 @@ interface Props {
 export function UsersScreen({ currentUserId, onUserUpdate }: Props) {
   const [user, setUser] = useState<UserResponseDto | null>(null);
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,30 +36,47 @@ export function UsersScreen({ currentUserId, onUserUpdate }: Props) {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentUserId || !username.trim()) return;
+    const nextUsername = username.trim();
+    const nextCurrentPassword = currentPassword.trim();
+    const nextNewPassword = newPassword.trim();
+
+    if (!currentUserId || !nextUsername) return;
+    if (!nextCurrentPassword || !nextNewPassword) {
+      setError('현재 비밀번호와 새 비밀번호를 입력하세요.');
+      setSuccess(false);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(false);
 
-    const data: { username?: string; password?: string } = {
-      username: username.trim(),
-    };
-    if (password.trim()) {
-      data.password = password.trim();
-    }
-
     try {
-      const updated = await updateUser(currentUserId, data);
-      setUser(updated);
-      setUsername(updated.username);
-      setPassword('');
+      const updated = await updateUser(currentUserId, {
+        username: nextUsername,
+        currentPassword: nextCurrentPassword,
+        newPassword: nextNewPassword,
+      });
+      const updatedUser: UserResponseDto = {
+        id: updated.id ?? user?.id ?? currentUserId,
+        username: updated.username,
+        role: updated.role,
+        rootFolderId: updated.rootFolderId,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      };
+
+      setUser(updatedUser);
+      setUsername(updatedUser.username);
+      setCurrentPassword('');
+      setNewPassword('');
       setSuccess(true);
 
       // Update localStorage to sync with App state
-      localStorage.setItem('user', JSON.stringify(updated));
+      localStorage.setItem('user', JSON.stringify(updatedUser));
       
       // Update parent component state immediately
-      onUserUpdate?.(updated);
+      onUserUpdate?.(updatedUser);
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
@@ -108,12 +126,24 @@ export function UsersScreen({ currentUserId, onUserUpdate }: Props) {
             </div>
 
             <div className="form-group">
-              <label>비밀번호 <span className="hint">(변경시에만 입력)</span></label>
+              <label>현재 비밀번호</label>
               <input
                 type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="새로운 비밀번호 입력"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                required
+                placeholder="현재 비밀번호 입력"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>새 비밀번호</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                placeholder="새 비밀번호 입력"
               />
             </div>
 
