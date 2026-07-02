@@ -1,14 +1,20 @@
 import { request } from './client';
-import type { UpdateUserRequestDto, UpdateUserResponseDto, UserResponseDto } from '../types';
+import type {
+  CreateUserRequestDto,
+  CreateUserResponseDto,
+  UpdateUserRequestDto,
+  UpdateUserResponseDto,
+  UserResponseDto,
+} from '../types';
 
 export function getUser(userId: number): Promise<UserResponseDto> {
   return request(`/users/${userId}`);
 }
 
-export async function createUser(username: string, password: string): Promise<UserResponseDto> {
+export async function createUser(data: CreateUserRequestDto): Promise<CreateUserResponseDto> {
   return request('/users', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify(data),
   });
 }
 

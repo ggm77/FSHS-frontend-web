@@ -648,7 +648,7 @@ export default function App() {
           {screen === 'gallery' && <GalleryScreen onOpenVideo={openVideo} onOpenFile={openViewer} />}
           {screen === 'search'  && <SearchScreen rootFolderId={rootFolderId} onOpenVideo={openVideo} onOpenFile={openViewer} initialQuery={topSearchQuery} />}
           {screen === 'share'   && <ShareScreen currentUserId={user?.id ?? null} onOpenVideo={openVideo} onOpenFile={openViewer} />}
-          {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
+          {screen === 'users'   && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} allowUserCreation={user?.role === 'ADMIN'} />}
           {screen === 'settings'     && <UsersScreen currentUserId={user?.id ?? null} onUserUpdate={(u) => setUser(u)} />}
           {screen === 'admin'        && <AdminScreen />}
           {screen === 'transcoding'  && <TranscodingScreen />}
