@@ -3,6 +3,7 @@ import Hls, { type ErrorData } from 'hls.js';
 import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
+import { PdfPreview } from '../components/PdfPreview';
 import { formatBytes } from '../api/files';
 import { VideoScreen } from './VideoScreen';
 import {
@@ -380,68 +381,35 @@ function SharedVideoPlayer({
   );
 }
 
-function SharedPdfPreview({ shareKey, file }: { shareKey: string; file: FileResponseDto }) {
+function SharedPdfPreview({ shareKey, file, onDownload, downloading }: {
+  shareKey: string;
+  file: FileResponseDto;
+  onDownload: () => void;
+  downloading: boolean;
+}) {
   const previewKey = `${shareKey}:${file.uuid || file.id}:${file.updatedAt}`;
-  const [preview, setPreview] = useState<{
-    key: string;
-    objectUrl?: string;
-    error?: string;
-  } | null>(null);
+  const [error, setError] = useState('');
+  const handlePreviewError = useCallback((message: string) => {
+    setError(message);
+  }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    const controller = new AbortController();
-
-    fetch(getSharedFileContentUrl(shareKey, false), {
-      credentials: 'include',
-      signal: controller.signal,
-    })
-      .then(async res => {
-        if (!res.ok) throw new Error(`PDF 미리보기 로드 실패: HTTP ${res.status}`);
-        const blob = await res.blob();
-        objectUrl = URL.createObjectURL(blob);
-        if (!cancelled) setPreview({ key: previewKey, objectUrl });
-      })
-      .catch(err => {
-        if (controller.signal.aborted || cancelled) return;
-        setPreview({
-          key: previewKey,
-          error: getErrorMessage(err, 'PDF 미리보기를 불러오지 못했습니다.'),
-        });
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [previewKey, shareKey]);
-
-  if (!preview || preview.key !== previewKey) {
-    return (
-      <div className="shared-doc-loader">
-        <Icon name="spinner" size={28} className="spin-icon" />
-        <span>PDF를 불러오는 중...</span>
-      </div>
-    );
-  }
-
-  if (preview.error || !preview.objectUrl) {
+  if (error) {
     return (
       <div className="shared-fallback">
         <SharedFileIcon file={file} size={52} />
         <h3>PDF 미리보기를 불러올 수 없습니다</h3>
-        <p>{preview.error || '원본 파일로 열거나 다운로드해서 확인하세요.'}</p>
-        <a className="shared-btn" href={getSharedFileContentUrl(shareKey, false)} target="_blank" rel="noreferrer">
-          <Icon name="doc" size={15} />
-          원본 열기
-        </a>
+        <p>{error}</p>
+        <button className="shared-btn" onClick={onDownload} disabled={downloading}>
+          <Icon name={downloading ? 'spinner' : 'download'} size={15} className={downloading ? 'spin-icon' : undefined} />
+          {downloading ? '다운로드 중...' : '다운로드'}
+        </button>
       </div>
     );
   }
 
-  return <iframe className="shared-doc-frame" src={preview.objectUrl} title={file.name} />;
+  return (
+    <PdfPreview key={previewKey} contentUrl={getSharedFileContentUrl(shareKey, false)} onError={handlePreviewError} />
+  );
 }
 
 function SharedHeicImagePreview({ shareKey, file }: { shareKey: string; file: FileResponseDto }) {
@@ -774,7 +742,7 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
     }
 
     if (isPdf(file)) {
-      return <SharedPdfPreview shareKey={shareKey} file={file} />;
+      return <SharedPdfPreview shareKey={shareKey} file={file} onDownload={handleDownload} downloading={downloading} />;
     }
 
     if (officePreviewKind) {
@@ -803,11 +771,11 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
       <div className="shared-fallback">
         <SharedFileIcon file={file} size={52} />
         <h3>브라우저에서 바로 열기 어려운 파일입니다</h3>
-        <p>원본 파일로 열거나 다운로드해서 확인하세요.</p>
-        <a className="shared-btn" href={contentUrl} target="_blank" rel="noreferrer">
-          <Icon name="doc" size={15} />
-          원본 열기
-        </a>
+        <p>다운로드해서 확인하세요.</p>
+        <button className="shared-btn" onClick={handleDownload} disabled={downloading}>
+          <Icon name={downloading ? 'spinner' : 'download'} size={15} className={downloading ? 'spin-icon' : undefined} />
+          {downloading ? '다운로드 중...' : '다운로드'}
+        </button>
       </div>
     );
   }
@@ -1243,11 +1211,50 @@ const sharedFileStyles = `
     font-size: 13px;
     line-height: 1.55;
   }
-  .shared-doc-frame {
+  .pdf-preview-scroll {
+    position: relative;
     width: 100%;
     height: min(76vh, 720px);
-    border: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
     background: #fff;
+  }
+  .pdf-preview-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+  }
+  .pdf-preview-page {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    background: #f5f5f5;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  }
+  .pdf-preview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .pdf-preview-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #5f6878;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(3px);
+  }
+  .pdf-preview-loading span {
+    font-size: 14px;
+    font-weight: 650;
+    color: #303848;
   }
   .viewer-text-wrap,
   .viewer-office-wrap {

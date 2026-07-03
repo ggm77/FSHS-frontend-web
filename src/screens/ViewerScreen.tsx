@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
+import { PdfPreview } from '../components/PdfPreview';
 import { getFile, getFileContentUrl, formatBytes, downloadFileContent } from '../api/files';
 import type { FileResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
@@ -176,7 +177,6 @@ function decodeTextPreview(buffer: ArrayBuffer, contentType: string | null): str
 export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
@@ -191,7 +191,6 @@ export function ViewerScreen({ fileId, onBack }: Props) {
     if (!fileId) return;
     setLoading(true);
     setFile(null);
-    setBlobUrl(null);
     setTextContent(null);
     setPreviewError('');
     setHeicBlobUrl(null);
@@ -214,20 +213,18 @@ export function ViewerScreen({ fileId, onBack }: Props) {
       ? 'powerpoint'
       : null;
   const isLegacyOfficeDocument = LEGACY_OFFICE_EXTENSIONS.has(extension);
-  const handleOfficePreviewError = useCallback((message: string) => {
+  const handlePreviewError = useCallback((message: string) => {
     setPreviewError(message);
   }, []);
 
   useEffect(() => {
-    setBlobUrl(null);
     setTextContent(null);
     setPreviewError('');
     setPreviewLoading(false);
 
-    if (!file || !fileId || (!isPdf && !isTextDocument)) return;
+    if (!file || !fileId || !isTextDocument) return;
 
     let cancelled = false;
-    let objectUrl: string;
     const controller = new AbortController();
 
     setPreviewLoading(true);
@@ -238,17 +235,11 @@ export function ViewerScreen({ fileId, onBack }: Props) {
     })
       .then(async r => {
         if (!r.ok) throw new Error(`미리보기 로드 실패: HTTP ${r.status}`);
-        if (isPdf) return r.blob();
         return r.arrayBuffer().then(buffer => decodeTextPreview(buffer, r.headers.get('Content-Type')));
       })
-      .then(blob => {
+      .then(text => {
         if (cancelled) return;
-        if (blob instanceof Blob) {
-          objectUrl = URL.createObjectURL(blob);
-          setBlobUrl(objectUrl);
-          return;
-        }
-        setTextContent(blob);
+        setTextContent(text);
       })
       .catch(err => {
         if (controller.signal.aborted) return;
@@ -261,11 +252,9 @@ export function ViewerScreen({ fileId, onBack }: Props) {
     return () => {
       cancelled = true;
       controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setBlobUrl(null);
       setTextContent(null);
     };
-  }, [file, fileId, isPdf, isTextDocument]);
+  }, [file, fileId, isTextDocument]);
 
   useEffect(() => {
     setHeicBlobUrl(null);
@@ -402,10 +391,8 @@ export function ViewerScreen({ fileId, onBack }: Props) {
         ) : isPdf ? (
           previewError ? (
             <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
-          ) : blobUrl ? (
-            <iframe src={blobUrl} className="viewer-iframe" title={file.name} />
           ) : (
-            <div className="viewer-loader"><Icon name="spinner" size={28} /><span>파일을 불러오는 중...</span></div>
+            <PdfPreview fileId={fileId} onError={handlePreviewError} />
           )
         ) : officePreviewKind ? (
           previewError ? (
@@ -422,7 +409,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
               <OfficePreview
                 fileId={fileId}
                 kind={officePreviewKind}
-                onError={handleOfficePreviewError}
+                onError={handlePreviewError}
               />
             </div>
           )
@@ -692,15 +679,55 @@ const viewerStyles = `
     border-radius: 8px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
   }
-  .viewer-iframe {
+  .pdf-preview-scroll {
+    position: relative;
     width: min(95%, 1080px);
     height: 82vh;
     min-width: 320px;
     min-height: 480px;
-    border: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .pdf-preview-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+  }
+  .pdf-preview-page {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    background: #f5f5f5;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  }
+  .pdf-preview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .pdf-preview-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #5f6878;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(3px);
+    border-radius: 12px;
+  }
+  .pdf-preview-loading span {
+    font-size: 14px;
+    font-weight: 650;
+    color: #303848;
   }
   .viewer-text-wrap {
     width: min(100%, 1120px);
