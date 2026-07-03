@@ -409,9 +409,9 @@ export function UsersScreen({ currentUserId, onUserUpdate, allowUserCreation = f
 const userScreenStyles = `
   .users-layout {
     display: grid;
-    grid-template-columns: minmax(320px, 480px) minmax(360px, 620px);
+    grid-template-columns: repeat(2, minmax(360px, 620px));
     gap: 20px;
-    align-items: start;
+    align-items: stretch;
   }
 
   .profile-card {
@@ -419,14 +419,18 @@ const userScreenStyles = `
     border: 1px solid var(--border-soft);
     border-radius: 12px;
     padding: 26px;
-    max-width: 480px;
+    max-width: 620px;
     margin-top: 20px;
     box-shadow: var(--shadow-sm);
     animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    display: flex;
+    flex-direction: column;
   }
 
-  .create-user-card {
-    max-width: 620px;
+  .profile-card > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
   }
 
   .card-title-row {
@@ -759,7 +763,8 @@ const userScreenStyles = `
   }
 
   .form-actions {
-    margin-top: 10px;
+    margin-top: auto;
+    padding-top: 10px;
   }
 
   .form-actions button {
