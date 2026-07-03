@@ -3,7 +3,10 @@ import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { PdfPreview } from '../components/PdfPreview';
-import { getFile, getFileContentUrl, formatBytes, downloadFileContent } from '../api/files';
+import { getFile, getFileContentUrl, formatBytes, deleteFile, downloadFileContent } from '../api/files';
+import { createFileShare, getSharedFileUrl } from '../api/shares';
+import { toAbsoluteUrl, getFileInfoGroups } from '../utils/fileInfo';
+import { copyTextToClipboard } from '../utils/clipboard';
 import type { FileResponseDto } from '../types';
 import type { DownloadProgress } from '../api/download';
 
@@ -174,6 +177,20 @@ function decodeTextPreview(buffer: ArrayBuffer, contentType: string | null): str
   }
 }
 
+interface DialogConfig {
+  type: 'alert' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm: () => void | Promise<void>;
+}
+
+interface CreatedShareState {
+  fileId: number;
+  fileName: string;
+  shareKey: string;
+  copied: boolean;
+}
+
 export function ViewerScreen({ fileId, onBack }: Props) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -186,6 +203,10 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   const [heicBlobUrl, setHeicBlobUrl] = useState<string | null>(null);
   const [heicConverting, setHeicConverting] = useState(false);
   const [heicError, setHeicError] = useState('');
+  const [showInfo, setShowInfo] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [createdShare, setCreatedShare] = useState<CreatedShareState | null>(null);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   useEffect(() => {
     if (!fileId) return;
@@ -320,6 +341,72 @@ export function ViewerScreen({ fileId, onBack }: Props) {
     ? Math.min(100, (downloadProgress.loadedBytes / downloadProgress.totalBytes) * 100)
     : null;
 
+  async function handleCreateShare() {
+    if (!file || sharing) return;
+    setSharing(true);
+    try {
+      const share = await createFileShare(file.id);
+      const shareUrl = toAbsoluteUrl(getSharedFileUrl(share.shareKey));
+      let copied = false;
+      try {
+        await copyTextToClipboard(shareUrl);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+      setCreatedShare({ fileId: share.fileId, fileName: file.name, shareKey: share.shareKey, copied });
+      const updated = await getFile(file.id).catch(() => null);
+      if (updated) setFile(updated);
+    } catch (err: unknown) {
+      setDialog({
+        type: 'alert',
+        title: '공유 실패',
+        message: getErrorMessage(err, '공유 링크를 생성하지 못했습니다.'),
+        onConfirm: () => setDialog(null),
+      });
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleCopyCreatedShare() {
+    if (!createdShare) return;
+    try {
+      await copyTextToClipboard(toAbsoluteUrl(getSharedFileUrl(createdShare.shareKey)));
+      setCreatedShare(prev => prev ? { ...prev, copied: true } : prev);
+    } catch (err: unknown) {
+      setDialog({
+        type: 'alert',
+        title: '복사 실패',
+        message: getErrorMessage(err, '링크를 복사하지 못했습니다.'),
+        onConfirm: () => setDialog(null),
+      });
+    }
+  }
+
+  function handleDeleteFile() {
+    if (!file) return;
+    setDialog({
+      type: 'confirm',
+      title: '파일 삭제',
+      message: '파일을 삭제하시겠습니까? 삭제된 파일은 복구할 수 없습니다.',
+      onConfirm: async () => {
+        try {
+          await deleteFile(file.id);
+          setDialog(null);
+          onBack();
+        } catch (err: unknown) {
+          setDialog({
+            type: 'alert',
+            title: '삭제 실패',
+            message: getErrorMessage(err, '파일을 삭제하지 못했습니다.'),
+            onConfirm: () => setDialog(null),
+          });
+        }
+      },
+    });
+  }
+
   return (
     <div className="viewer-page">
       <style>{viewerStyles}</style>
@@ -335,6 +422,15 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           </div>
         )}
         <div className="viewer-actions">
+          <button className="vbtn-icon" onClick={() => setShowInfo(true)} disabled={!file} title="파일 정보">
+            <Icon name="info" size={16} />
+          </button>
+          <button className="vbtn-icon" onClick={handleCreateShare} disabled={!file || sharing} title="공유">
+            <Icon name={sharing ? 'spinner' : 'share'} size={16} />
+          </button>
+          <button className="vbtn-icon danger" onClick={handleDeleteFile} disabled={!file} title="삭제">
+            <Icon name="trash" size={16} />
+          </button>
           <button className="vbtn-download" onClick={handleDownload} disabled={!file || downloading}>
             <Icon name={downloading ? 'spinner' : 'download'} size={14} /> {downloading ? '다운로드 중...' : '다운로드'}
           </button>
@@ -461,6 +557,104 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           </div>
         )}
       </div>
+
+      {showInfo && file && (
+        <div className="modal-backdrop" onClick={() => setShowInfo(false)}>
+          <div className="modal file-info-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="file-info-title">
+                <span className="file-info-icon">
+                  <Icon name="doc" size={20} color="var(--accent)" stroke={1.7} />
+                </span>
+                <div>
+                  <h3>파일 정보</h3>
+                  <p title={file.name}>{file.name}</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-body">
+              {getFileInfoGroups(file).map(group => {
+                const items = group.items.filter(item => item.value != null && item.value !== '');
+                if (items.length === 0) return null;
+                return (
+                  <section className="file-info-section" key={group.title}>
+                    <h4>{group.title}</h4>
+                    <div className="file-info-grid">
+                      {items.map(item => (
+                        <div className="file-info-item" key={`${group.title}-${item.label}`}>
+                          <span>{item.label}</span>
+                          <strong title={item.value ?? undefined}>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+            <div className="modal-footer">
+              <button className="btn primary" onClick={() => setShowInfo(false)}>닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createdShare && (
+        <div className="modal-backdrop" onClick={() => setCreatedShare(null)}>
+          <div className="modal share-created-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>공유 링크 생성 완료</h3>
+                <p>{createdShare.fileName}</p>
+              </div>
+              <button className="close-btn" onClick={() => setCreatedShare(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="share-created-field">
+                <span>공유 링크</span>
+                <input
+                  readOnly
+                  value={toAbsoluteUrl(getSharedFileUrl(createdShare.shareKey))}
+                  onFocus={e => e.currentTarget.select()}
+                />
+              </label>
+              <div className={createdShare.copied ? 'share-copy-note good' : 'share-copy-note'}>
+                {createdShare.copied ? '링크를 클립보드에 복사했습니다.' : '링크 복사가 필요하면 아래 버튼을 눌러주세요.'}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setCreatedShare(null)}>닫기</button>
+              <button className="btn primary" onClick={handleCopyCreatedShare}>
+                <Icon name={createdShare.copied ? 'check' : 'copy'} size={14} color="var(--accent-fg)" />
+                {createdShare.copied ? '복사됨' : '링크 복사'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dialog && (
+        <div className="modal-backdrop" onClick={() => setDialog(null)}>
+          <div className="modal confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{dialog.title}</h3>
+              <button className="close-btn" onClick={() => setDialog(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>{dialog.message}</p>
+            </div>
+            <div className="modal-footer">
+              {dialog.type === 'confirm' && (
+                <button className="btn" onClick={() => setDialog(null)}>취소</button>
+              )}
+              <button className="btn primary" onClick={dialog.onConfirm}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -550,6 +744,29 @@ const viewerStyles = `
     flex: 0 0 auto;
     display: flex;
     gap: 8px;
+  }
+  .vbtn-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #eee;
+    border: 0;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .vbtn-icon:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .vbtn-icon.danger:hover {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+  }
+  .vbtn-icon:disabled {
+    opacity: .5;
+    cursor: not-allowed;
   }
   .vbtn-download {
     display: flex;
@@ -936,5 +1153,240 @@ const viewerStyles = `
     .viewer-office-content.powerpoint {
       padding: 16px 8px 28px;
     }
+  }
+
+  .file-info-modal {
+    width: min(720px, calc(100vw - 32px));
+    max-height: min(780px, calc(100vh - 48px));
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .file-info-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .file-info-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .file-info-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: var(--accent-soft);
+  }
+  .file-info-title h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fg);
+  }
+  .file-info-title p {
+    margin: 4px 0 0;
+    color: var(--fg-3);
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 560px;
+  }
+  .file-info-modal .modal-body {
+    padding: 18px 20px;
+    display: grid;
+    gap: 18px;
+    overflow-y: auto;
+  }
+  .file-info-section h4 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--fg-3);
+  }
+  .file-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+  }
+  .file-info-item {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--surface-1);
+  }
+  .file-info-item span {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--fg-3);
+    font-size: 11.5px;
+    font-weight: 750;
+  }
+  .file-info-item strong {
+    display: block;
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 700;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding-bottom: 2px;
+  }
+  .file-info-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--hairline);
+  }
+  @media (max-width: 640px) {
+    .file-info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .share-created-modal {
+    width: min(520px, calc(100vw - 32px));
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .share-created-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .share-created-modal h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--fg);
+  }
+  .share-created-modal .modal-header p {
+    margin: 4px 0 0;
+    color: var(--fg-3);
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 360px;
+  }
+  .share-created-modal .modal-body {
+    padding: 18px 20px;
+    display: grid;
+    gap: 12px;
+  }
+  .share-created-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .share-created-field span {
+    color: var(--fg-3);
+    font-size: 12px;
+    font-weight: 750;
+  }
+  .share-created-field input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-1);
+    color: var(--fg);
+    padding: 9px 10px;
+    font: inherit;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .share-copy-note {
+    color: var(--fg-3);
+    font-size: 12.5px;
+  }
+  .share-copy-note.good {
+    color: var(--good);
+    font-weight: 700;
+  }
+  .share-created-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .confirm-modal {
+    width: 360px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .confirm-modal .modal-header {
+    padding: 18px 20px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .confirm-modal .modal-header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .confirm-modal .modal-header .close-btn {
+    background: transparent;
+    border: 0;
+    color: var(--fg-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 4px;
+    border-radius: 6px;
+  }
+  .confirm-modal .modal-header .close-btn:hover {
+    background: var(--surface-1);
+    color: var(--fg);
+  }
+  .confirm-modal .modal-body {
+    padding: 20px;
+    font-size: 13.5px;
+    color: var(--fg-2);
+    line-height: 1.5;
+  }
+  .confirm-modal .modal-footer {
+    padding: 12px 20px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: var(--bg);
+    border-top: 1px solid var(--hairline);
+  }
+  .confirm-modal .modal-footer button {
+    height: 36px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
   }
 `;
