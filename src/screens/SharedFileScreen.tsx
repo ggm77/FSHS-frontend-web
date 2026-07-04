@@ -15,7 +15,6 @@ import {
   getSharedFileThumbnailUrl,
 } from '../api/sharedFiles';
 import { getSharedFilePageUrl, type SharedFilePageView } from '../api/shares';
-import type { DownloadProgress } from '../api/download';
 import type { FileResponseDto } from '../types';
 
 interface SharedFileScreenProps {
@@ -381,11 +380,10 @@ function SharedVideoPlayer({
   );
 }
 
-function SharedPdfPreview({ shareKey, file, onDownload, downloading }: {
+function SharedPdfPreview({ shareKey, file, onDownload }: {
   shareKey: string;
   file: FileResponseDto;
   onDownload: () => void;
-  downloading: boolean;
 }) {
   const previewKey = `${shareKey}:${file.uuid || file.id}:${file.updatedAt}`;
   const [error, setError] = useState('');
@@ -399,9 +397,9 @@ function SharedPdfPreview({ shareKey, file, onDownload, downloading }: {
         <SharedFileIcon file={file} size={52} />
         <h3>PDF 미리보기를 불러올 수 없습니다</h3>
         <p>{error}</p>
-        <button className="shared-btn" onClick={onDownload} disabled={downloading}>
-          <Icon name={downloading ? 'spinner' : 'download'} size={15} className={downloading ? 'spin-icon' : undefined} />
-          {downloading ? '다운로드 중...' : '다운로드'}
+        <button className="shared-btn" onClick={onDownload}>
+          <Icon name="download" size={15} />
+          다운로드
         </button>
       </div>
     );
@@ -610,9 +608,6 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [downloadError, setDownloadError] = useState('');
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -646,25 +641,10 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
-  async function handleDownload() {
-    if (!file || downloading) return;
-
-    setDownloadError('');
-    setDownloadProgress({ loadedBytes: 0, totalBytes: null });
-    setDownloading(true);
-    try {
-      await downloadSharedFileContent(shareKey, file.name, progress => setDownloadProgress(progress));
-    } catch (err: unknown) {
-      setDownloadError(getErrorMessage(err, '다운로드에 실패했습니다.'));
-    } finally {
-      setDownloading(false);
-      setDownloadProgress(null);
-    }
+  function handleDownload() {
+    if (!file) return;
+    downloadSharedFileContent(shareKey, file.name);
   }
-
-  const downloadPercent = downloadProgress?.totalBytes
-    ? Math.min(100, (downloadProgress.loadedBytes / downloadProgress.totalBytes) * 100)
-    : null;
 
   function renderInfo() {
     if (!file) return null;
@@ -742,7 +722,7 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
     }
 
     if (isPdf(file)) {
-      return <SharedPdfPreview shareKey={shareKey} file={file} onDownload={handleDownload} downloading={downloading} />;
+      return <SharedPdfPreview shareKey={shareKey} file={file} onDownload={handleDownload} />;
     }
 
     if (officePreviewKind) {
@@ -759,9 +739,9 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
           <SharedFileIcon file={file} size={52} />
           <h3>구형 Office 형식은 미리볼 수 없습니다</h3>
           <p>{extension.toUpperCase()} 파일은 DOCX 또는 PPTX로 저장한 뒤 다시 열어주세요.</p>
-          <button className="shared-btn" onClick={handleDownload} disabled={downloading}>
-            <Icon name={downloading ? 'spinner' : 'download'} size={15} className={downloading ? 'spin-icon' : undefined} />
-            {downloading ? '다운로드 중...' : '다운로드'}
+          <button className="shared-btn" onClick={handleDownload}>
+            <Icon name="download" size={15} />
+            다운로드
           </button>
         </div>
       );
@@ -772,9 +752,9 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
         <SharedFileIcon file={file} size={52} />
         <h3>브라우저에서 바로 열기 어려운 파일입니다</h3>
         <p>다운로드해서 확인하세요.</p>
-        <button className="shared-btn" onClick={handleDownload} disabled={downloading}>
-          <Icon name={downloading ? 'spinner' : 'download'} size={15} className={downloading ? 'spin-icon' : undefined} />
-          {downloading ? '다운로드 중...' : '다운로드'}
+        <button className="shared-btn" onClick={handleDownload}>
+          <Icon name="download" size={15} />
+          다운로드
         </button>
       </div>
     );
@@ -849,30 +829,15 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
                   <span>{formatPath(file.parentPath)}</span>
                 </div>
                 <div className="shared-actions">
-                  <button className="shared-btn primary" onClick={handleDownload} disabled={downloading}>
-                    <Icon name={downloading ? 'spinner' : 'download'} size={15} color="var(--accent-fg)" className={downloading ? 'spin-icon' : undefined} />
-                    {downloading ? '다운로드 중...' : '다운로드'}
+                  <button className="shared-btn primary" onClick={handleDownload}>
+                    <Icon name="download" size={15} color="var(--accent-fg)" />
+                    다운로드
                   </button>
                   <button className="shared-btn" onClick={() => selectView(getPreferredView(file))}>
                     <Icon name={file.category === 'VIDEO' ? 'play' : 'eye'} size={15} />
                     미리보기
                   </button>
                 </div>
-                {downloadError && <div className="shared-inline-error">{downloadError}</div>}
-                {downloadProgress && (
-                  <div className="shared-download-progress">
-                    <div className="shared-progress-top">
-                      <span>{downloadPercent == null ? '받는 중' : `${Math.floor(downloadPercent)}%`}</span>
-                      <strong>{formatBytes(downloadProgress.loadedBytes)}</strong>
-                    </div>
-                    <div className="shared-progress-track">
-                      <div
-                        className={downloadPercent == null ? 'indeterminate' : ''}
-                        style={{ width: downloadPercent == null ? '100%' : `${downloadPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
             </section>
 
@@ -1374,38 +1339,6 @@ const sharedFileStyles = `
     color: var(--bad);
     font-size: 12.5px;
     font-weight: 750;
-  }
-  .shared-download-progress {
-    margin-top: 16px;
-  }
-  .shared-progress-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    color: var(--fg-3);
-    font-size: 12px;
-    font-weight: 750;
-  }
-  .shared-progress-track {
-    height: 7px;
-    margin-top: 8px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--surface-2);
-  }
-  .shared-progress-track > div {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent);
-  }
-  .shared-progress-track > div.indeterminate {
-    animation: shared-progress 1.1s ease-in-out infinite;
-  }
-  @keyframes shared-progress {
-    0% { transform: translateX(-100%); }
-    50% { transform: translateX(0); }
-    100% { transform: translateX(100%); }
   }
   @media (max-width: 760px) {
     .shared-shell {

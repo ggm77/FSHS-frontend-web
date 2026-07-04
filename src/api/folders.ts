@@ -1,5 +1,5 @@
 import { request } from './client';
-import { downloadUrl, type DownloadProgress } from './download';
+import { downloadUrl } from './download';
 import type { FolderResponseDto, FolderSyncResponseDto } from '../types';
 
 export function getFolder(folderId: number): Promise<FolderResponseDto> {
@@ -32,10 +32,6 @@ export function getFolderDownloadUrl(folderId: number): string {
   return `/api/v2/folders/${folderId}/content`;
 }
 
-export function downloadFolderContent(
-  folderId: number,
-  filename: string,
-  onProgress?: (progress: DownloadProgress) => void,
-): Promise<void> {
-  return downloadUrl(getFolderDownloadUrl(folderId), filename, { onProgress });
+export function downloadFolderContent(folderId: number, filename: string): void {
+  downloadUrl(getFolderDownloadUrl(folderId), filename);
 }

@@ -4,7 +4,6 @@ import { getFolder, createFolder, deleteFolder, renameFolder, downloadFolderCont
 import { uploadFile, deleteFile, formatBytes, getFileStatus, moveFile, downloadFileContent, getFileThumbnailUrl } from '../api/files';
 import { createFileShare, getSharedFileUrl } from '../api/shares';
 import type { FolderResponseDto, SimpleFolderResponseDto, FileResponseDto, FolderSyncResponseDto } from '../types';
-import type { DownloadProgress } from '../api/download';
 import { copyTextToClipboard } from '../utils/clipboard';
 import { toAbsoluteUrl, formatDateTime, getFileInfoGroups } from '../utils/fileInfo';
 
@@ -282,14 +281,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     onConfirm: () => void | Promise<void>;
   }
 
-  interface DownloadState {
-    key: string;
-    name: string;
-    loadedBytes: number;
-    totalBytes: number | null;
-    status: 'DOWNLOADING' | 'COMPLETE';
-  }
-
   interface CreatedShareState {
     fileId: number;
     fileName: string;
@@ -311,7 +302,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   const [uploading, setUploading] = useState(false);
   const [showUploadStatus, setShowUploadStatus] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
-  const [downloadState, setDownloadState] = useState<DownloadState | null>(null);
   const [syncingFolder, setSyncingFolder] = useState(false);
   const [syncResult, setSyncResult] = useState<FolderSyncResponseDto | null>(null);
   const [syncResultFolderName, setSyncResultFolderName] = useState('');
@@ -345,7 +335,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
   const activeFolderId = folder?.id ?? currentFolderId ?? null;
-  const downloadingKey = downloadState?.key ?? null;
   const sortedFolders = useMemo(
     () => folder ? sortFileItems(folder.folders, sortKey, sortDirection) : [],
     [folder, sortDirection, sortKey],
@@ -682,43 +671,16 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     setMovingItem({ type, id, name });
   }
 
-  async function runDownload(
-    key: string,
-    name: string,
-    task: (onProgress: (progress: DownloadProgress) => void) => Promise<void>,
-  ) {
-    if (downloadState) return;
-    setError('');
-    setDownloadState({ key, name, loadedBytes: 0, totalBytes: null, status: 'DOWNLOADING' });
-    try {
-      await task((progress) => {
-        setDownloadState(prev => prev?.key === key ? {
-          ...prev,
-          loadedBytes: progress.loadedBytes,
-          totalBytes: progress.totalBytes,
-        } : prev);
-      });
-      setDownloadState(prev => prev?.key === key ? { ...prev, status: 'COMPLETE' } : prev);
-      setTimeout(() => {
-        setDownloadState(prev => prev?.key === key ? null : prev);
-      }, 2000);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, '다운로드에 실패했습니다.'));
-      setDownloadState(null);
-    }
-  }
-
   function handleDownloadFolder(folder: SimpleFolderResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
     setActionMenu(null);
-    const filename = `${folder.name}.zip`;
-    runDownload(`folder-${folder.id}`, filename, onProgress => downloadFolderContent(folder.id, filename, onProgress));
+    downloadFolderContent(folder.id, `${folder.name}.zip`);
   }
 
   function handleDownloadFile(file: FileResponseDto, e: React.MouseEvent) {
     e.stopPropagation();
     setActionMenu(null);
-    runDownload(`file-${file.id}`, file.name, onProgress => downloadFileContent(file.id, file.name, onProgress));
+    downloadFileContent(file.id, file.name);
   }
 
   async function handleCreateShare(file: FileResponseDto, e: React.MouseEvent) {
@@ -1179,15 +1141,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   />
                   {actionMenuFile.isShared ? '공유 링크 추가 생성' : '공유 링크 생성'}
                 </button>
-                <button
-                  onClick={e => handleDownloadFile(actionMenuFile, e)}
-                  disabled={downloadingKey !== null}
-                >
-                  <Icon
-                    name={downloadingKey === `file-${actionMenuFile.id}` ? 'spinner' : 'download'}
-                    size={15}
-                    className={downloadingKey === `file-${actionMenuFile.id}` ? 'spin-icon' : undefined}
-                  />
+                <button onClick={e => handleDownloadFile(actionMenuFile, e)}>
+                  <Icon name="download" size={15} />
                   다운로드
                 </button>
                 <button onClick={e => handleStartMove('file', actionMenuFile.id, actionMenuFile.name, e)}>
@@ -1205,15 +1160,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                   <Icon name="info" size={15} />
                   폴더 정보보기
                 </button>
-                <button
-                  onClick={e => handleDownloadFolder(actionMenuFolder, e)}
-                  disabled={downloadingKey !== null}
-                >
-                  <Icon
-                    name={downloadingKey === `folder-${actionMenuFolder.id}` ? 'spinner' : 'download'}
-                    size={15}
-                    className={downloadingKey === `folder-${actionMenuFolder.id}` ? 'spin-icon' : undefined}
-                  />
+                <button onClick={e => handleDownloadFolder(actionMenuFolder, e)}>
+                  <Icon name="download" size={15} />
                   폴더 다운로드
                 </button>
                 <button onClick={e => handleStartMove('folder', actionMenuFolder.id, actionMenuFolder.name, e)}>
@@ -1271,57 +1219,6 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {downloadState && (
-        <div className="upload-status-widget download-status-widget" style={{ bottom: showUploadStatus ? 360 : 24 }}>
-          <div className="widget-header">
-            <span className="title">
-              {downloadState.status === 'COMPLETE' ? (
-                <>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'rgba(52, 199, 89, 0.2)', color: '#34c759', marginRight: 8 }}>
-                    <Icon name="check" size={11} stroke={3} />
-                  </span>
-                  다운로드 완료
-                </>
-              ) : (
-                <>
-                  <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
-                  파일 다운로드 중
-                </>
-              )}
-            </span>
-          </div>
-          <div className="widget-body">
-            <div className="file-info-row">
-              <span className="file-name-txt" title={downloadState.name}>{downloadState.name}</span>
-              <span className="pct-txt">
-                {downloadState.status === 'COMPLETE'
-                  ? '100%'
-                  : downloadState.totalBytes
-                    ? `${Math.min(100, Math.floor((downloadState.loadedBytes / downloadState.totalBytes) * 100))}%`
-                    : formatBytes(downloadState.loadedBytes)}
-              </span>
-            </div>
-            <div className="widget-progress-bg">
-              <div
-                className={`widget-progress-fill ${downloadState.status === 'COMPLETE' ? 'complete' : downloadState.totalBytes ? '' : 'processing'}`}
-                style={{
-                  width: downloadState.status === 'COMPLETE' || downloadState.totalBytes
-                    ? `${Math.min(100, downloadState.status === 'COMPLETE' ? 100 : (downloadState.loadedBytes / (downloadState.totalBytes ?? 1)) * 100)}%`
-                    : '100%',
-                }}
-              />
-            </div>
-            <div className="download-byte-row">
-              {downloadState.status === 'COMPLETE'
-                ? formatBytes(downloadState.loadedBytes)
-                : downloadState.totalBytes
-                  ? `${formatBytes(downloadState.loadedBytes)} / ${formatBytes(downloadState.totalBytes)}`
-                  : `${formatBytes(downloadState.loadedBytes)} 받는 중`}
-            </div>
           </div>
         </div>
       )}

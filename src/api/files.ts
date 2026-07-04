@@ -1,5 +1,5 @@
 import { request, getCookie, createApiErrorFromBody } from './client';
-import { downloadUrl, type DownloadProgress } from './download';
+import { downloadUrl } from './download';
 import type { FileCategory, FileResponseDto, FileStatusDto } from '../types';
 
 export type FileSearchSortKey = 'name' | 'size' | 'originUpdatedAt' | 'updatedAt';
@@ -111,12 +111,8 @@ export function getFileThumbnailUrl(fileUuid: string): string {
   return `/api/v2/files/${encodeURIComponent(fileUuid)}/thumbnail`;
 }
 
-export function downloadFileContent(
-  fileId: number,
-  filename: string,
-  onProgress?: (progress: DownloadProgress) => void,
-): Promise<void> {
-  return downloadUrl(getFileContentUrl(fileId, true), filename, { onProgress });
+export function downloadFileContent(fileId: number, filename: string): void {
+  downloadUrl(getFileContentUrl(fileId, true), filename);
 }
 
 export function getFileStreamUrl(fileId: number, start = 0): string {

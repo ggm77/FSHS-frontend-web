@@ -8,7 +8,6 @@ import { createFileShare, getSharedFileUrl } from '../api/shares';
 import { toAbsoluteUrl, getFileInfoGroups } from '../utils/fileInfo';
 import { copyTextToClipboard } from '../utils/clipboard';
 import type { FileResponseDto } from '../types';
-import type { DownloadProgress } from '../api/download';
 
 interface Props {
   fileId: number | null;
@@ -197,9 +196,6 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   const [textContent, setTextContent] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
-  const [downloadError, setDownloadError] = useState('');
   const [heicBlobUrl, setHeicBlobUrl] = useState<string | null>(null);
   const [heicConverting, setHeicConverting] = useState(false);
   const [heicError, setHeicError] = useState('');
@@ -322,24 +318,10 @@ export function ViewerScreen({ fileId, onBack }: Props) {
 
   const fileUrl = getFileContentUrl(fileId, false);
 
-  async function handleDownload() {
-    if (!file || downloading) return;
-    setDownloadError('');
-    setDownloadProgress({ loadedBytes: 0, totalBytes: null });
-    setDownloading(true);
-    try {
-      await downloadFileContent(file.id, file.name, progress => setDownloadProgress(progress));
-    } catch (err: unknown) {
-      setDownloadError(getErrorMessage(err, '다운로드에 실패했습니다.'));
-    } finally {
-      setDownloading(false);
-      setDownloadProgress(null);
-    }
+  function handleDownload() {
+    if (!file) return;
+    downloadFileContent(file.id, file.name);
   }
-
-  const downloadPercent = downloadProgress?.totalBytes
-    ? Math.min(100, (downloadProgress.loadedBytes / downloadProgress.totalBytes) * 100)
-    : null;
 
   async function handleCreateShare() {
     if (!file || sharing) return;
@@ -431,33 +413,13 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           <button className="vbtn-icon danger" onClick={handleDeleteFile} disabled={!file} title="삭제">
             <Icon name="trash" size={16} />
           </button>
-          <button className="vbtn-download" onClick={handleDownload} disabled={!file || downloading}>
-            <Icon name={downloading ? 'spinner' : 'download'} size={14} /> {downloading ? '다운로드 중...' : '다운로드'}
+          <button className="vbtn-download" onClick={handleDownload} disabled={!file}>
+            <Icon name="download" size={14} /> 다운로드
           </button>
         </div>
       </div>
 
       <div className="viewer-body">
-        {downloadError && <div className="viewer-download-error">{downloadError}</div>}
-        {downloading && downloadProgress && (
-          <div className="viewer-download-progress">
-            <div className="progress-top">
-              <span>{file?.name || '파일'}</span>
-              <strong>{downloadPercent == null ? formatBytes(downloadProgress.loadedBytes) : `${Math.floor(downloadPercent)}%`}</strong>
-            </div>
-            <div className="progress-track">
-              <div
-                className={downloadPercent == null ? 'progress-fill indeterminate' : 'progress-fill'}
-                style={{ width: downloadPercent == null ? '100%' : `${downloadPercent}%` }}
-              />
-            </div>
-            <div className="progress-bytes">
-              {downloadProgress.totalBytes
-                ? `${formatBytes(downloadProgress.loadedBytes)} / ${formatBytes(downloadProgress.totalBytes)}`
-                : `${formatBytes(downloadProgress.loadedBytes)} 받는 중`}
-            </div>
-          </div>
-        )}
         {loading ? (
           <div className="viewer-loader">
             <Icon name="spinner" size={28} />
@@ -473,7 +435,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
                 <span>HEIC 변환 중...</span>
               </div>
             ) : heicError ? (
-              <PreviewError message={`HEIC 변환 실패: ${heicError}`} onDownload={handleDownload} downloading={downloading} />
+              <PreviewError message={`HEIC 변환 실패: ${heicError}`} onDownload={handleDownload} />
             ) : heicBlobUrl ? (
               <div className="viewer-media-wrap">
                 <img src={heicBlobUrl} alt={file.name} className="viewer-img" />
@@ -486,13 +448,13 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           )
         ) : isPdf ? (
           previewError ? (
-            <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
+            <PreviewError message={previewError} onDownload={handleDownload} />
           ) : (
             <PdfPreview fileId={fileId} onError={handlePreviewError} />
           )
         ) : officePreviewKind ? (
           previewError ? (
-            <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
+            <PreviewError message={previewError} onDownload={handleDownload} />
           ) : (
             <div className="viewer-office-wrap">
               <div className="viewer-office-bar">
@@ -511,7 +473,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
           )
         ) : isTextDocument ? (
           previewError ? (
-            <PreviewError message={previewError} onDownload={handleDownload} downloading={downloading} />
+            <PreviewError message={previewError} onDownload={handleDownload} />
           ) : textContent !== null ? (
             <div className="viewer-text-wrap">
               <div className="viewer-text-bar">
@@ -540,8 +502,8 @@ export function ViewerScreen({ fileId, onBack }: Props) {
               {extension.toUpperCase()} 파일은 브라우저에서 직접 해석하기 어렵습니다.
               DOCX 또는 PPTX로 저장한 뒤 다시 열어주세요.
             </p>
-            <button className="vbtn-action" onClick={handleDownload} disabled={downloading}>
-              <Icon name={downloading ? 'spinner' : 'download'} size={16} /> {downloading ? '다운로드 중...' : '다운로드 받기'}
+            <button className="vbtn-action" onClick={handleDownload}>
+              <Icon name="download" size={16} /> 다운로드 받기
             </button>
           </div>
         ) : (
@@ -551,8 +513,8 @@ export function ViewerScreen({ fileId, onBack }: Props) {
             </div>
             <h3>미리보기를 지원하지 않는 파일 형식입니다</h3>
             <p>이 파일은 브라우저에서 직접 열 수 없습니다. 다운로드하여 확인하세요.</p>
-            <button className="vbtn-action" onClick={handleDownload} disabled={downloading}>
-              <Icon name={downloading ? 'spinner' : 'download'} size={16} /> {downloading ? '다운로드 중...' : '다운로드 받기'}
+            <button className="vbtn-action" onClick={handleDownload}>
+              <Icon name="download" size={16} /> 다운로드 받기
             </button>
           </div>
         )}
@@ -659,10 +621,9 @@ export function ViewerScreen({ fileId, onBack }: Props) {
   );
 }
 
-function PreviewError({ message, onDownload, downloading }: {
+function PreviewError({ message, onDownload }: {
   message: string;
   onDownload: () => void;
-  downloading: boolean;
 }) {
   return (
     <div className="viewer-fallback">
@@ -671,8 +632,8 @@ function PreviewError({ message, onDownload, downloading }: {
       </div>
       <h3>미리보기를 불러올 수 없습니다</h3>
       <p>{message}</p>
-      <button className="vbtn-action" onClick={onDownload} disabled={downloading}>
-        <Icon name={downloading ? 'spinner' : 'download'} size={16} /> {downloading ? '다운로드 중...' : '다운로드 받기'}
+      <button className="vbtn-action" onClick={onDownload}>
+        <Icon name="download" size={16} /> 다운로드 받기
       </button>
     </div>
   );
@@ -799,75 +760,6 @@ const viewerStyles = `
     overflow: hidden;
     position: relative;
     padding: 24px;
-  }
-  .viewer-download-error {
-    position: absolute;
-    top: 18px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2;
-    max-width: calc(100% - 32px);
-    padding: 10px 14px;
-    border-radius: 10px;
-    background: rgba(239, 68, 68, 0.18);
-    color: #fecaca;
-    font-size: 13px;
-  }
-  .viewer-download-progress {
-    position: absolute;
-    top: 18px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2;
-    width: min(420px, calc(100% - 32px));
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(22, 24, 34, 0.94);
-    border: 0.5px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  }
-  .viewer-download-progress .progress-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 12.5px;
-    color: #fff;
-  }
-  .viewer-download-progress .progress-top span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .viewer-download-progress .progress-top strong,
-  .viewer-download-progress .progress-bytes {
-    font-variant-numeric: tabular-nums;
-  }
-  .viewer-download-progress .progress-track {
-    height: 6px;
-    margin-top: 9px;
-    border-radius: 99px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.12);
-  }
-  .viewer-download-progress .progress-fill {
-    height: 100%;
-    border-radius: 99px;
-    background: var(--accent, #5b50e8);
-    transition: width 0.15s ease-out;
-  }
-  .viewer-download-progress .progress-fill.indeterminate {
-    animation: pulse 1.5s infinite;
-  }
-  .viewer-download-progress .progress-bytes {
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: #aaa;
-  }
-  @keyframes pulse {
-    0% { opacity: 0.45; }
-    50% { opacity: 1; }
-    100% { opacity: 0.45; }
   }
   .viewer-loader {
     display: flex;

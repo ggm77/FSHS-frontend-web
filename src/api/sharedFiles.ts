@@ -1,5 +1,5 @@
 import { BASE, request } from './client';
-import { downloadUrl, type DownloadProgress } from './download';
+import { downloadUrl } from './download';
 import type { FileResponseDto } from '../types';
 
 function encodeShareKey(shareKey: string): string {
@@ -27,10 +27,6 @@ export function getSharedFileThumbnailUrl(shareKey: string): string {
   return `${BASE}/auth/files/${encodeShareKey(shareKey)}/thumbnail`;
 }
 
-export function downloadSharedFileContent(
-  shareKey: string,
-  filename: string,
-  onProgress?: (progress: DownloadProgress) => void,
-): Promise<void> {
-  return downloadUrl(getSharedFileContentUrl(shareKey, true), filename, { onProgress });
+export function downloadSharedFileContent(shareKey: string, filename: string): void {
+  downloadUrl(getSharedFileContentUrl(shareKey, true), filename);
 }
