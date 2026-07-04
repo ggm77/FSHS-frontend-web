@@ -287,6 +287,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
     name: string;
     loadedBytes: number;
     totalBytes: number | null;
+    status: 'DOWNLOADING' | 'COMPLETE';
   }
 
   interface CreatedShareState {
@@ -688,7 +689,7 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   ) {
     if (downloadState) return;
     setError('');
-    setDownloadState({ key, name, loadedBytes: 0, totalBytes: null });
+    setDownloadState({ key, name, loadedBytes: 0, totalBytes: null, status: 'DOWNLOADING' });
     try {
       await task((progress) => {
         setDownloadState(prev => prev?.key === key ? {
@@ -697,9 +698,12 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
           totalBytes: progress.totalBytes,
         } : prev);
       });
+      setDownloadState(prev => prev?.key === key ? { ...prev, status: 'COMPLETE' } : prev);
+      setTimeout(() => {
+        setDownloadState(prev => prev?.key === key ? null : prev);
+      }, 2000);
     } catch (err: unknown) {
       setError(getErrorMessage(err, '다운로드에 실패했습니다.'));
-    } finally {
       setDownloadState(null);
     }
   }
@@ -1275,33 +1279,48 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
         <div className="upload-status-widget download-status-widget" style={{ bottom: showUploadStatus ? 360 : 24 }}>
           <div className="widget-header">
             <span className="title">
-              <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
-              파일 다운로드 중
+              {downloadState.status === 'COMPLETE' ? (
+                <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'rgba(52, 199, 89, 0.2)', color: '#34c759', marginRight: 8 }}>
+                    <Icon name="check" size={11} stroke={3} />
+                  </span>
+                  다운로드 완료
+                </>
+              ) : (
+                <>
+                  <Icon name="spinner" size={16} className="spin-icon" style={{ marginRight: 8 }} />
+                  파일 다운로드 중
+                </>
+              )}
             </span>
           </div>
           <div className="widget-body">
             <div className="file-info-row">
               <span className="file-name-txt" title={downloadState.name}>{downloadState.name}</span>
               <span className="pct-txt">
-                {downloadState.totalBytes
-                  ? `${Math.min(100, Math.floor((downloadState.loadedBytes / downloadState.totalBytes) * 100))}%`
-                  : formatBytes(downloadState.loadedBytes)}
+                {downloadState.status === 'COMPLETE'
+                  ? '100%'
+                  : downloadState.totalBytes
+                    ? `${Math.min(100, Math.floor((downloadState.loadedBytes / downloadState.totalBytes) * 100))}%`
+                    : formatBytes(downloadState.loadedBytes)}
               </span>
             </div>
             <div className="widget-progress-bg">
               <div
-                className={`widget-progress-fill ${downloadState.totalBytes ? '' : 'processing'}`}
+                className={`widget-progress-fill ${downloadState.status === 'COMPLETE' ? 'complete' : downloadState.totalBytes ? '' : 'processing'}`}
                 style={{
-                  width: downloadState.totalBytes
-                    ? `${Math.min(100, (downloadState.loadedBytes / downloadState.totalBytes) * 100)}%`
+                  width: downloadState.status === 'COMPLETE' || downloadState.totalBytes
+                    ? `${Math.min(100, downloadState.status === 'COMPLETE' ? 100 : (downloadState.loadedBytes / (downloadState.totalBytes ?? 1)) * 100)}%`
                     : '100%',
                 }}
               />
             </div>
             <div className="download-byte-row">
-              {downloadState.totalBytes
-                ? `${formatBytes(downloadState.loadedBytes)} / ${formatBytes(downloadState.totalBytes)}`
-                : `${formatBytes(downloadState.loadedBytes)} 받는 중`}
+              {downloadState.status === 'COMPLETE'
+                ? formatBytes(downloadState.loadedBytes)
+                : downloadState.totalBytes
+                  ? `${formatBytes(downloadState.loadedBytes)} / ${formatBytes(downloadState.totalBytes)}`
+                  : `${formatBytes(downloadState.loadedBytes)} 받는 중`}
             </div>
           </div>
         </div>

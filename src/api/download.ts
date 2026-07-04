@@ -38,10 +38,12 @@ function parseFilename(contentDisposition: string | null): string | undefined {
 }
 
 function getTotalBytes(res: Response): number | null {
-  const contentLength = res.headers.get('Content-Length');
-  if (!contentLength) return null;
+  // 폴더 다운로드는 압축이 스트리밍되어 Content-Length가 없으므로, 서버가 예상 크기를 담아 보내는
+  // X-Total-Size 헤더를 사용한다.
+  const sizeHeader = res.headers.get('Content-Length') || res.headers.get('X-Total-Size');
+  if (!sizeHeader) return null;
 
-  const total = Number(contentLength);
+  const total = Number(sizeHeader);
   return Number.isFinite(total) && total > 0 ? total : null;
 }
 
