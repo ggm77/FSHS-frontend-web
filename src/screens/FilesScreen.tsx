@@ -335,6 +335,8 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
 
   const currentFolderId = path.length > 0 ? path[path.length - 1].id : rootFolderId;
   const activeFolderId = folder?.id ?? currentFolderId ?? null;
+  const activeFolderIdRef = useRef<number | null>(null);
+  activeFolderIdRef.current = activeFolderId;
   const sortedFolders = useMemo(
     () => folder ? sortFileItems(folder.folders, sortKey, sortDirection) : [],
     [folder, sortDirection, sortKey],
@@ -491,6 +493,10 @@ export function FilesScreen({ rootFolderId, onOpenVideo, onOpenFile }: Props) {
   useEffect(() => {
     const handleLocationChange = () => {
       if (rootFolderId == null) return;
+      // 비디오/뷰어 미리보기 진입·이탈도 popstate로 돌아오는데, 폴더 해시는 그대로이므로
+      // 같은 폴더를 다시 불러와 목록을 스피너로 교체하고 스크롤 위치를 날리는 일을 막는다.
+      const folderId = getFolderIdFromHash() ?? rootFolderId;
+      if (folderId === activeFolderIdRef.current) return;
       loadFolderFromLocation('replace');
     };
 
