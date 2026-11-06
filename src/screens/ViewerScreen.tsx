@@ -3,6 +3,7 @@ import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { HwpPreview } from '../components/HwpPreview';
+import { SpreadsheetPreview } from '../components/SpreadsheetPreview';
 import { PdfPreview } from '../components/PdfPreview';
 import { getFile, getFileContentUrl, formatBytes, deleteFile, downloadFileContent } from '../api/files';
 import { createFileShare, getSharedFileUrl } from '../api/shares';
@@ -132,7 +133,8 @@ const TEXT_PREVIEW_MIME_TYPES = new Set([
 
 const WORD_DOCUMENT_EXTENSIONS = new Set(['docx', 'docm']);
 const POWERPOINT_EXTENSIONS = new Set(['pptx', 'pptm']);
-const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt']);
+const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt', 'xls']);
+const SPREADSHEET_EXTENSIONS = new Set(['xlsx', 'xlsm']);
 const HANGUL_DOCUMENT_EXTENSIONS = new Set(['hwp', 'hwpx']);
 
 function normalizeExtension(extension?: string | null): string {
@@ -233,6 +235,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
       : null;
   const isLegacyOfficeDocument = LEGACY_OFFICE_EXTENSIONS.has(extension);
   const isHangulDocument = HANGUL_DOCUMENT_EXTENSIONS.has(extension);
+  const isSpreadsheet = SPREADSHEET_EXTENSIONS.has(extension);
   const handlePreviewError = useCallback((message: string) => {
     setPreviewError(message);
   }, []);
@@ -489,6 +492,21 @@ export function ViewerScreen({ fileId, onBack }: Props) {
               <HwpPreview fileId={fileId} onError={handlePreviewError} />
             </div>
           )
+        ) : isSpreadsheet ? (
+          previewError ? (
+            <PreviewError message={previewError} onDownload={handleDownload} />
+          ) : (
+            <div className="viewer-office-wrap">
+              <div className="viewer-office-bar">
+                <div className="viewer-office-kind">
+                  <Icon name="sheet" size={16} />
+                  <span>Excel 스프레드시트</span>
+                </div>
+                <span>브라우저에서 미리보기</span>
+              </div>
+              <SpreadsheetPreview fileId={fileId} onError={handlePreviewError} />
+            </div>
+          )
         ) : isTextDocument ? (
           previewError ? (
             <PreviewError message={previewError} onDownload={handleDownload} />
@@ -513,12 +531,12 @@ export function ViewerScreen({ fileId, onBack }: Props) {
         ) : isLegacyOfficeDocument ? (
           <div className="viewer-fallback">
             <div className="icon-wrap">
-              <Icon name={extension === 'ppt' ? 'presentation' : 'doc'} size={48} stroke={1.2} />
+              <Icon name={extension === 'ppt' ? 'presentation' : extension === 'xls' ? 'sheet' : 'doc'} size={48} stroke={1.2} />
             </div>
             <h3>구형 Office 형식은 미리볼 수 없습니다</h3>
             <p>
               {extension.toUpperCase()} 파일은 브라우저에서 직접 해석하기 어렵습니다.
-              DOCX 또는 PPTX로 저장한 뒤 다시 열어주세요.
+              DOCX, PPTX 또는 XLSX로 저장한 뒤 다시 열어주세요.
             </p>
             <button className="vbtn-action" onClick={handleDownload}>
               <Icon name="download" size={16} /> 다운로드 받기

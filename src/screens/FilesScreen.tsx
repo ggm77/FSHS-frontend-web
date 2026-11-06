@@ -85,6 +85,7 @@ function FileIcon({ file, size = 20 }: { file: FileResponseDto; size?: number })
     : extension === 'tsx' || extension === 'ts' || extension === 'js' ? 'code'
     : extension === 'pptx' || extension === 'pptm' || extension === 'ppt' ? 'presentation'
     : extension === 'docx' || extension === 'docm' || extension === 'doc' ? 'doc'
+    : extension === 'xlsx' || extension === 'xlsm' || extension === 'xls' || extension === 'csv' ? 'sheet'
     : CATEGORY_ICON[file.category] || 'doc';
 
   const color = extension === 'pdf' ? 'var(--c-pdf)'

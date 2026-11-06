@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { PdfPreview } from '../components/PdfPreview';
 import { HwpPreview } from '../components/HwpPreview';
+import { SpreadsheetPreview } from '../components/SpreadsheetPreview';
 import { formatBytes } from '../api/files';
 import { VideoScreen } from './VideoScreen';
 import {
@@ -151,7 +152,8 @@ const TEXT_PREVIEW_MIME_TYPES = new Set([
 
 const WORD_DOCUMENT_EXTENSIONS = new Set(['docx', 'docm']);
 const POWERPOINT_EXTENSIONS = new Set(['pptx', 'pptm']);
-const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt']);
+const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt', 'xls']);
+const SPREADSHEET_EXTENSIONS = new Set(['xlsx', 'xlsm']);
 const HANGUL_DOCUMENT_EXTENSIONS = new Set(['hwp', 'hwpx']);
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -246,6 +248,7 @@ function getFileIconMeta(file: FileResponseDto | null): { iconName: string; colo
     : extension === 'tsx' || extension === 'ts' || extension === 'js' ? 'code'
     : extension === 'pptx' || extension === 'pptm' || extension === 'ppt' ? 'presentation'
     : extension === 'docx' || extension === 'docm' || extension === 'doc' ? 'doc'
+    : extension === 'xlsx' || extension === 'xlsm' || extension === 'xls' || extension === 'csv' ? 'sheet'
     : CATEGORY_ICON[file.category] || 'doc';
 
   const color = extension === 'pdf' ? 'var(--c-pdf)'
@@ -645,6 +648,45 @@ function SharedHangulDocumentPreview({
   );
 }
 
+function SharedSpreadsheetPreview({
+  shareKey,
+  file,
+}: {
+  shareKey: string;
+  file: FileResponseDto;
+}) {
+  const [sheetError, setSheetError] = useState('');
+  const handleSheetPreviewError = useCallback((message: string) => {
+    setSheetError(message);
+  }, []);
+
+  if (sheetError) {
+    return (
+      <div className="shared-fallback">
+        <SharedFileIcon file={file} size={52} />
+        <h3>스프레드시트 미리보기를 불러올 수 없습니다</h3>
+        <p>{sheetError}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="viewer-office-wrap shared-office-wrap">
+      <div className="viewer-office-bar">
+        <div className="viewer-office-kind">
+          <Icon name="sheet" size={16} />
+          <span>Excel 스프레드시트</span>
+        </div>
+        <span>브라우저에서 미리보기</span>
+      </div>
+      <SpreadsheetPreview
+        contentUrl={getSharedFileContentUrl(shareKey, false)}
+        onError={handleSheetPreviewError}
+      />
+    </div>
+  );
+}
+
 export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -774,6 +816,10 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
       return <SharedHangulDocumentPreview shareKey={shareKey} file={file} />;
     }
 
+    if (SPREADSHEET_EXTENSIONS.has(extension)) {
+      return <SharedSpreadsheetPreview shareKey={shareKey} file={file} />;
+    }
+
     if (isTextDocument) {
       return <SharedTextPreview shareKey={shareKey} file={file} isSourceCode={isSourceCode} />;
     }
@@ -783,7 +829,7 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
         <div className="shared-fallback">
           <SharedFileIcon file={file} size={52} />
           <h3>구형 Office 형식은 미리볼 수 없습니다</h3>
-          <p>{extension.toUpperCase()} 파일은 DOCX 또는 PPTX로 저장한 뒤 다시 열어주세요.</p>
+          <p>{extension.toUpperCase()} 파일은 DOCX, PPTX 또는 XLSX로 저장한 뒤 다시 열어주세요.</p>
           <button className="shared-btn" onClick={handleDownload}>
             <Icon name="download" size={15} />
             다운로드

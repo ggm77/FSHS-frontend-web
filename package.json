@@ -13,8 +13,10 @@
     "@aiden0z/pptx-renderer": "^1.2.0",
     "@rhwp/core": "^0.8.7",
     "docx-preview": "^0.3.7",
+    "exceljs": "^4.4.0",
     "heic2any": "^0.0.4",
     "hls.js": "^1.6.16",
+    "numfmt": "^4.1.2",
     "pdfjs-dist": "^5.7.284",
     "react": "18.3.1",
     "react-dom": "18.3.1"

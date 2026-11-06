@@ -33,6 +33,7 @@ function getFileIcon(file: FileResponseDto | undefined): string {
   if (extension === 'pdf') return 'pdf';
   if (extension === 'zip' || extension === 'rar' || extension === '7z') return 'archive';
   if (extension === 'pptx' || extension === 'pptm' || extension === 'ppt') return 'presentation';
+  if (extension === 'xlsx' || extension === 'xlsm' || extension === 'xls' || extension === 'csv') return 'sheet';
   if (file.category === 'IMAGE') return 'image';
   if (file.category === 'VIDEO') return 'videoFile';
   if (file.category === 'AUDIO') return 'audioFile';

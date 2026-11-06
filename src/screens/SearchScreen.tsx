@@ -71,6 +71,7 @@ function getFileIconName(file: FileResponseDto): string {
   if (extension === 'tsx' || extension === 'ts' || extension === 'js') return 'code';
   if (extension === 'pptx' || extension === 'pptm' || extension === 'ppt') return 'presentation';
   if (extension === 'docx' || extension === 'docm' || extension === 'doc') return 'doc';
+  if (extension === 'xlsx' || extension === 'xlsm' || extension === 'xls' || extension === 'csv') return 'sheet';
   return CATEGORY_ICON[file.category] || 'doc';
 }
 
