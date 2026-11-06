@@ -4,6 +4,7 @@ import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
 import { PdfPreview } from '../components/PdfPreview';
+import { HwpPreview } from '../components/HwpPreview';
 import { formatBytes } from '../api/files';
 import { VideoScreen } from './VideoScreen';
 import {
@@ -151,6 +152,7 @@ const TEXT_PREVIEW_MIME_TYPES = new Set([
 const WORD_DOCUMENT_EXTENSIONS = new Set(['docx', 'docm']);
 const POWERPOINT_EXTENSIONS = new Set(['pptx', 'pptm']);
 const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt']);
+const HANGUL_DOCUMENT_EXTENSIONS = new Set(['hwp', 'hwpx']);
 
 function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
@@ -604,6 +606,45 @@ function SharedOfficeDocumentPreview({
   );
 }
 
+function SharedHangulDocumentPreview({
+  shareKey,
+  file,
+}: {
+  shareKey: string;
+  file: FileResponseDto;
+}) {
+  const [hwpError, setHwpError] = useState('');
+  const handleHwpPreviewError = useCallback((message: string) => {
+    setHwpError(message);
+  }, []);
+
+  if (hwpError) {
+    return (
+      <div className="shared-fallback">
+        <SharedFileIcon file={file} size={52} />
+        <h3>문서 미리보기를 불러올 수 없습니다</h3>
+        <p>{hwpError}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="viewer-office-wrap shared-office-wrap">
+      <div className="viewer-office-bar">
+        <div className="viewer-office-kind">
+          <Icon name="doc" size={16} />
+          <span>한글 문서</span>
+        </div>
+        <span>브라우저에서 미리보기</span>
+      </div>
+      <HwpPreview
+        contentUrl={getSharedFileContentUrl(shareKey, false)}
+        onError={handleHwpPreviewError}
+      />
+    </div>
+  );
+}
+
 export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
   const [file, setFile] = useState<FileResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -727,6 +768,10 @@ export function SharedFileScreen({ shareKey, view }: SharedFileScreenProps) {
 
     if (officePreviewKind) {
       return <SharedOfficeDocumentPreview shareKey={shareKey} file={file} kind={officePreviewKind} />;
+    }
+
+    if (HANGUL_DOCUMENT_EXTENSIONS.has(extension)) {
+      return <SharedHangulDocumentPreview shareKey={shareKey} file={file} />;
     }
 
     if (isTextDocument) {
@@ -1308,6 +1353,23 @@ const sharedFileStyles = `
     width: 100%;
     padding: 28px 24px 48px;
   }
+  .hwp-preview-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 28px 24px 48px;
+  }
+  .hwp-preview-page {
+    width: 100%;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.16);
+  }
+  .hwp-preview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
   .viewer-office-loading {
     position: absolute;
     inset: 0;
@@ -1403,6 +1465,10 @@ const sharedFileStyles = `
     }
     .viewer-office-content.powerpoint {
       padding: 16px 8px 28px;
+    }
+    .hwp-preview-pages {
+      gap: 14px;
+      padding: 14px 8px 28px;
     }
   }
 `;

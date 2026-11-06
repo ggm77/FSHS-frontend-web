@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import heic2any from 'heic2any';
 import { Icon } from '../components/Icon';
 import { OfficePreview, type OfficePreviewKind } from '../components/OfficePreview';
+import { HwpPreview } from '../components/HwpPreview';
 import { PdfPreview } from '../components/PdfPreview';
 import { getFile, getFileContentUrl, formatBytes, deleteFile, downloadFileContent } from '../api/files';
 import { createFileShare, getSharedFileUrl } from '../api/shares';
@@ -132,6 +133,7 @@ const TEXT_PREVIEW_MIME_TYPES = new Set([
 const WORD_DOCUMENT_EXTENSIONS = new Set(['docx', 'docm']);
 const POWERPOINT_EXTENSIONS = new Set(['pptx', 'pptm']);
 const LEGACY_OFFICE_EXTENSIONS = new Set(['doc', 'ppt']);
+const HANGUL_DOCUMENT_EXTENSIONS = new Set(['hwp', 'hwpx']);
 
 function normalizeExtension(extension?: string | null): string {
   return (extension || '').trim().replace(/^\./, '').toLowerCase();
@@ -230,6 +232,7 @@ export function ViewerScreen({ fileId, onBack }: Props) {
       ? 'powerpoint'
       : null;
   const isLegacyOfficeDocument = LEGACY_OFFICE_EXTENSIONS.has(extension);
+  const isHangulDocument = HANGUL_DOCUMENT_EXTENSIONS.has(extension);
   const handlePreviewError = useCallback((message: string) => {
     setPreviewError(message);
   }, []);
@@ -469,6 +472,21 @@ export function ViewerScreen({ fileId, onBack }: Props) {
                 kind={officePreviewKind}
                 onError={handlePreviewError}
               />
+            </div>
+          )
+        ) : isHangulDocument ? (
+          previewError ? (
+            <PreviewError message={previewError} onDownload={handleDownload} />
+          ) : (
+            <div className="viewer-office-wrap">
+              <div className="viewer-office-bar">
+                <div className="viewer-office-kind">
+                  <Icon name="doc" size={16} />
+                  <span>한글 문서</span>
+                </div>
+                <span>브라우저에서 미리보기</span>
+              </div>
+              <HwpPreview fileId={fileId} onError={handlePreviewError} />
             </div>
           )
         ) : isTextDocument ? (
@@ -908,6 +926,23 @@ const viewerStyles = `
     width: 100%;
     padding: 28px 24px 48px;
   }
+  .hwp-preview-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 28px 24px 48px;
+  }
+  .hwp-preview-page {
+    width: 100%;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.16);
+  }
+  .hwp-preview-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
   .viewer-office-loading {
     position: absolute;
     inset: 0;
@@ -1044,6 +1079,10 @@ const viewerStyles = `
     }
     .viewer-office-content.powerpoint {
       padding: 16px 8px 28px;
+    }
+    .hwp-preview-pages {
+      gap: 14px;
+      padding: 14px 8px 28px;
     }
   }
 
